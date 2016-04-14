@@ -121,6 +121,7 @@ int main() {
         NULL, 
         NULL, 
         &status);
+    printf("num D%d\n", numDevices);
 
     //-----------------------------------------------------
     // STEP 4: Create a command queue
