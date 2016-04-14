@@ -30,29 +30,62 @@ const char* programSource =
 "}                                                   \n"
 ;
 
+
+double** Make2DArr(double** inArr, int nodes) {
+    inArr = (double**) malloc(nodes*sizeof(double*));
+    for (int i = 0; i < nodes; i++){
+       inArr[i] = (double*) malloc(nodes*sizeof(double));
+    }
+} 
+
 int main() {
     // This code executes on the OpenCL host
-    
+    const int k = 5;
+
     // Host data
-    int *A = NULL;  // Input array
-    int *B = NULL;  // Input array
-    int *C = NULL;  // Output array
-    
-    // Elements in each array
-    const int elements = 2048;   
+    double **C = NULL;  // Cost array
+    double **P = NULL;  // Pheromone array
+    int **S = NULL;     // Path taken
+    double *cost = NULL;// cost of path
+
+    //TODO somehow track number of ants outputting this soln?
+    //      This can be calc'd afterwards
+
+    // Nodes to represent in each array
+    const int nodes = 10;
+    // Constant to start pheromone on
+    const double pherStart = 1;
     
     // Compute the size of the data 
-    size_t datasize = sizeof(int)*elements;
+    size_t datasizeC = sizeof(double)*nodes*nodes;
+    size_t datasizeP = sizeof(double)*nodes*nodes;
+    size_t datasizeS = sizeof(int)*nodes*k;
+    size_t datasizeCost = sizeof(int);
 
     // Allocate space for input/output data
-    A = (int*)malloc(datasize);
-    B = (int*)malloc(datasize);
-    C = (int*)malloc(datasize);
-    // Initialize the input data
-    for(int i = 0; i < elements; i++) {
-        A[i] = i;
-        B[i] = i;
+    C = Make2DArr(C, nodes);
+    P = Make2DArr(P, nodes);
+    S = (int*)malloc(nodes);
+
+    // Initialize the input pheromones
+    for(int j = 0; j < nodes; j++) {
+        for(int i = 0; i < nodes; i++) {
+            P[i][j] = pherStart;
+        }
     }
+
+    // Initialize the input graph
+    for(int j = 0; j < nodes; j++) {
+        for(int i = 0; i < nodes; i++) {
+            C[i][j] = 0;
+        }
+    }
+
+    C[0][2]=5;
+    C[0][4]=5;
+    C[1][6]=5;
+    C[1][6]=5;
+
 
     // Use this to check the output of each API call
     cl_int status;  
@@ -143,32 +176,33 @@ int main() {
     
     cl_mem bufferA;  // Input array on the device
     cl_mem bufferB;  // Input array on the device
-    cl_mem bufferC;  // Output array on the device
+    cl_mem bufferS;  // Output array on the device
 
-    // Use clCreateBuffer() to create a buffer object (d_A) 
-    // that will contain the data from the host array A
     bufferA = clCreateBuffer(
         context, 
         CL_MEM_READ_ONLY,                         
-        datasize, 
+        datasizeC, 
         NULL, 
         &status);
 
-    // Use clCreateBuffer() to create a buffer object (d_B)
-    // that will contain the data from the host array B
     bufferB = clCreateBuffer(
         context, 
         CL_MEM_READ_ONLY,                         
-        datasize, 
+        datasizeP, 
         NULL, 
         &status);
 
-    // Use clCreateBuffer() to create a buffer object (d_C) 
-    // with enough space to hold the output data
-    bufferC = clCreateBuffer(
+    bufferS = clCreateBuffer(
         context, 
         CL_MEM_WRITE_ONLY,                 
-        datasize, 
+        datasizeS, 
+        NULL, 
+        &status);
+
+    bufferS = clCreateBuffer(
+        context, 
+        CL_MEM_WRITE_ONLY,                 
+        datasizeS, 
         NULL, 
         &status);
     
