@@ -1,19 +1,27 @@
+
+-------------
 Different parallelisations:
-	ants
+-------------
+	-ants
 		better with larger graphs where explore less?
-	probablity of edge
+	-probablity of edge
 		should be better with smaller
 		should be broken down per node as need sum of all vals to do
-	phermonal calc update
+	-phermonal calc update
 
 
+-------------
 Compare:
-
-	using private constant to global const
+-------------
+	- different start location should have no diff
+	- using private constant to global const
 		//eeehh, maybe to show off understandinf of openCL
 
+
+-------------
 Discuss ants:
-	not using the cost array
+-------------
+	not using the cost array effectively, recalcing all of this so many times (well depending on k)
 
 	Use of boolean array to represent visited nodes, since need to visit all and need to look up often is much faster
 		does this affect memory? How much?
@@ -33,7 +41,9 @@ Discuss ants:
 		https://stackoverflow.com/questions/9912143/how-to-get-a-random-number-in-opencl
 
 
+-------------
 Discuss generic:
+-------------
 	This is an undirected graph, it _should_ have triangular array.
 		Requires much more searching? NO, just more accessing?
 
@@ -44,7 +54,9 @@ Discuss generic:
 
 
 
+-------------
 TODO
+-------------
 	When searching prev nodes use hash set
 
 	Conditional path taking using PCG as random generator
@@ -59,7 +71,9 @@ TODO
 
 
 
+-------------
 APPEND
+-------------
 		
 //using shitty visitin list
 bool hasSeen(int* visited, int possVisit){

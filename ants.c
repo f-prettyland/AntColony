@@ -11,6 +11,7 @@ const char fileName[] = "./antKernel.cl";
 typedef struct Params
 {
     int Nodes;
+    int StartNode;
     double Alpha;
     double Beta;
 } Params;
@@ -43,6 +44,8 @@ int main() {
 
     Params params;
     params.Nodes = nodes;
+
+    params.StartNode = 0;
     //cost weighting
     params.Alpha = 1;
     //pheromone weighting
@@ -55,7 +58,7 @@ int main() {
     size_t datasizeP    = sizeof(double)*nodes*nodes;
     //Need to make a decision at each node so need a random seed at each one of the
     size_t datasizeR    = sizeof(double)*nodes;
-    size_t datasizeS    = sizeof(int)*nodes*k;
+    size_t datasizeS    = sizeof(int)*(nodes+1)*k;
     size_t datasizeSC   = sizeof(double)*k;
 
     // Allocate space for input/output data
