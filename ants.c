@@ -6,6 +6,14 @@
 
 #define MAX_SOURCE_SIZE (10000)  
 
+const char fileName[] = "./antKernel.cl";
+
+typedef struct Params
+{
+    int Nodes;
+    double Alpha;
+    double Beta;
+} Params;
 
 void make2DInt(int** inArr, int nodes) {
     inArr = (int**) malloc(nodes*sizeof(int*));
@@ -29,14 +37,24 @@ int main() {
     //      This can be calc'd afterwards
 
     // Nodes to represent in each array
-    const int nodes = 10;
+    const int nodes = 5;
     // Constant to start pheromone on
     const double pherStart = 1;
+
+    Params params;
+    params.Nodes = nodes;
+    //cost weighting
+    params.Alpha = 1;
+    //pheromone weighting
+    params.Beta = 1;
     
     // Compute the size of the data 
+    size_t datasizeParams   = sizeof(Params);
+
     size_t datasizeC    = sizeof(double)*nodes*nodes;
     size_t datasizeP    = sizeof(double)*nodes*nodes;
-    size_t datasizeR    = sizeof(double)*k;
+    //Need to make a decision at each node so need a random seed at each one of the
+    size_t datasizeR    = sizeof(double)*nodes;
     size_t datasizeS    = sizeof(int)*nodes*k;
     size_t datasizeSC   = sizeof(double)*k;
 
@@ -54,27 +72,39 @@ int main() {
         }
     }
 
-    // Initialize the input graph
+    // todo, calloc this?
     for(int j = 0; j < nodes; j++) {
         for(int i = 0; i < nodes; i++) {
             C[(j*nodes)+i] = 0;
         }
     }
 
-    C[(0*nodes)+1]=5;
-    C[(0*nodes)+3]=5;
-    C[(1*nodes)+5]=5;
-    C[(2*nodes)+6]=5;
-    C[(3*nodes)+2]=2;
-    C[(4*nodes)+5]=5;
-    C[(5*nodes)+9]=5;
-    C[(6*nodes)+7]=5;
-    C[(7*nodes)+8]=5;
-    C[(8*nodes)+9]=5;
+    C[(0*nodes)+1]=2.0;
+    C[(0*nodes)+2]=3;
+    C[(0*nodes)+3]=3;
+    C[(0*nodes)+4]=4;
 
+    C[(1*nodes)+0]=2;
+    C[(1*nodes)+2]=2;
+    C[(1*nodes)+3]=9;
+    C[(1*nodes)+4]=8;
+
+    C[(2*nodes)+0]=3;
+    C[(2*nodes)+1]=2;
+    C[(2*nodes)+3]=10;
+    C[(2*nodes)+4]=9;
+
+    C[(3*nodes)+0]=3;
+    C[(3*nodes)+1]=9;
+    C[(3*nodes)+2]=10;
+    C[(3*nodes)+4]=6;
+
+    C[(4*nodes)+0]=4;
+    C[(4*nodes)+1]=8;
+    C[(4*nodes)+2]=9;
+    C[(4*nodes)+3]=6;
 
     FILE *fp;
-    const char fileName[] = "./antKernel.cl";
     size_t source_size;
     char *programSource;
 
@@ -137,7 +167,7 @@ int main() {
 
     // Fill in devices with clGetDeviceIDs()
     status = clGetDeviceIDs(
-        platforms[platformToUse], 
+        platforms[0], 
         CL_DEVICE_TYPE_ALL,        
         numDevices, 
         devices, 
@@ -177,6 +207,7 @@ int main() {
     // STEP 5: Create device buffers
     //----------------------------------------------------- 
     
+    cl_mem bufferParam;  // cost array on the device
     cl_mem bufferC;  // cost array on the device
     cl_mem bufferP;  // Pheromone array on the device
     cl_mem bufferR;  // Input array on the device
@@ -184,6 +215,13 @@ int main() {
     cl_mem bufferSC;  // Output cost from the device
 
     // if doing CL_MEM_READ_WRITE
+
+    bufferParam = clCreateBuffer(
+        context,
+        CL_MEM_READ_ONLY,
+        sizeof(Params),
+        NULL,
+        &status);
 
     bufferC = clCreateBuffer(
         context, 
@@ -219,6 +257,7 @@ int main() {
         datasizeSC, 
         NULL, 
         &status);
+
     
     //-----------------------------------------------------
     // STEP 6: Write host data to device buffers
@@ -253,6 +292,17 @@ int main() {
         0, 
         datasizeR,                                  
         R, 
+        0, 
+        NULL, 
+        NULL);
+
+    status = clEnqueueWriteBuffer(
+        cmdQueue, 
+        bufferParam, 
+        CL_TRUE, 
+        0, 
+        datasizeParams,                                  
+        &params, 
         0, 
         NULL, 
         NULL);
@@ -300,25 +350,30 @@ int main() {
         kernel, 
         0, 
         sizeof(cl_mem), 
-        &bufferC);
-    status |= clSetKernelArg(
+        &bufferParam);
+    status  = clSetKernelArg(
         kernel, 
         1, 
         sizeof(cl_mem), 
-        &bufferP);
+        &bufferC);
     status |= clSetKernelArg(
         kernel, 
         2, 
         sizeof(cl_mem), 
-        &bufferR);
+        &bufferP);
     status |= clSetKernelArg(
         kernel, 
         3, 
         sizeof(cl_mem), 
-        &bufferS);
+        &bufferR);
     status |= clSetKernelArg(
         kernel, 
         4, 
+        sizeof(cl_mem), 
+        &bufferS);
+    status |= clSetKernelArg(
+        kernel, 
+        5, 
         sizeof(cl_mem), 
         &bufferSC);
 
@@ -384,6 +439,7 @@ int main() {
     clReleaseKernel(kernel);
     clReleaseProgram(program);
     clReleaseCommandQueue(cmdQueue);
+    clReleaseMemObject(bufferParam);
     clReleaseMemObject(bufferC);
     clReleaseMemObject(bufferP);
     clReleaseMemObject(bufferR);
