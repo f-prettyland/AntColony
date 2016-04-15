@@ -9,3 +9,4 @@ vecadd: vecadd.c
 
 clean:
 	rm -f vecadd *~
+	rm -f ants *~

@@ -1,40 +1,16 @@
-// Code derives from example in “Heterogeneous Computing with OpenCL” 
-// published 2011 by Morgan Kaufmann
-
-
-// This program implements a vector addition using OpenCL
-
-// System includes
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
-// OpenCL includes
 #include <CL/cl.h>
 
-// OpenCL kernel to perform an element-wise 
-// add of two arrays                        
-const char* programSource =
-"__kernel                                            \n"
-"void vecadd(__global int *A,                        \n"
-"            __global int *B,                        \n"
-"            __global int *C)                        \n"
-"{                                                   \n"
-"                                                    \n"
-"   // Get the work-item’s unique ID                 \n"
-"   int idx = get_global_id(0);                      \n"
-"                                                    \n"
-"   // Add the corresponding locations of            \n"
-"   // 'A' and 'B', and store the result in 'C'.     \n"
-"   C[idx] = A[idx] + B[idx];                        \n"
-"}                                                   \n"
-;
+#define MAX_SOURCE_SIZE (10000)  
 
 
-double** Make2DArr(double** inArr, int nodes) {
-    inArr = (double**) malloc(nodes*sizeof(double*));
+void make2DInt(int** inArr, int nodes) {
+    inArr = (int**) malloc(nodes*sizeof(int*));
     for (int i = 0; i < nodes; i++){
-       inArr[i] = (double*) malloc(nodes*sizeof(double));
+       inArr[i] = (int*) malloc(nodes*sizeof(int));
     }
 } 
 
@@ -43,10 +19,11 @@ int main() {
     const int k = 5;
 
     // Host data
-    double **C = NULL;  // Cost array
-    double **P = NULL;  // Pheromone array
-    int **S = NULL;     // Path taken
-    double *cost = NULL;// cost of path
+    double *C   = NULL;  // Cost array
+    double *P   = NULL;  // Pheromone array
+    double *R   = NULL;     // Ants randomness
+    int *S      = NULL;     // Path taken
+    double *SC  = NULL;// cost of solution
 
     //TODO somehow track number of ants outputting this soln?
     //      This can be calc'd afterwards
@@ -57,40 +34,60 @@ int main() {
     const double pherStart = 1;
     
     // Compute the size of the data 
-    size_t datasizeC = sizeof(double)*nodes*nodes;
-    size_t datasizeP = sizeof(double)*nodes*nodes;
-    size_t datasizeS = sizeof(int)*nodes*k;
-    size_t datasizeCost = sizeof(int);
+    size_t datasizeC    = sizeof(double)*nodes*nodes;
+    size_t datasizeP    = sizeof(double)*nodes*nodes;
+    size_t datasizeR    = sizeof(double)*k;
+    size_t datasizeS    = sizeof(int)*nodes*k;
+    size_t datasizeSC   = sizeof(double)*k;
 
     // Allocate space for input/output data
-    C = Make2DArr(C, nodes);
-    P = Make2DArr(P, nodes);
-    S = (int*)malloc(nodes);
+    C   = (double*)malloc(datasizeC);
+    P   = (double*)malloc(datasizeP);
+    R   = (double*)malloc(datasizeR);
+    S   = (int*)malloc(datasizeS);
+    SC  = (double*)malloc(datasizeSC);
 
     // Initialize the input pheromones
     for(int j = 0; j < nodes; j++) {
         for(int i = 0; i < nodes; i++) {
-            P[i][j] = pherStart;
+            P[(j*nodes)+i] = pherStart;
         }
     }
 
     // Initialize the input graph
     for(int j = 0; j < nodes; j++) {
         for(int i = 0; i < nodes; i++) {
-            C[i][j] = 0;
+            C[(j*nodes)+i] = 0;
         }
     }
 
-    C[0][1]=5;
-    C[0][3]=5;
-    C[1][5]=5;
-    C[2][6]=5;
-    C[3][2]=2;
-    C[4][5]=5;
-    C[5][9]=5;
-    C[6][7]=5;
-    C[7][8]=5;
-    C[8][9]=5;
+    C[(0*nodes)+1]=5;
+    C[(0*nodes)+3]=5;
+    C[(1*nodes)+5]=5;
+    C[(2*nodes)+6]=5;
+    C[(3*nodes)+2]=2;
+    C[(4*nodes)+5]=5;
+    C[(5*nodes)+9]=5;
+    C[(6*nodes)+7]=5;
+    C[(7*nodes)+8]=5;
+    C[(8*nodes)+9]=5;
+
+
+    FILE *fp;
+    const char fileName[] = "./antKernel.cl";
+    size_t source_size;
+    char *programSource;
+
+    /* Load kernel source file */
+    fp = fopen(fileName, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed to load kernel.\n");    
+        exit(1);
+    }   
+    programSource = (char *)malloc(MAX_SOURCE_SIZE);
+    source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
+    fclose(fp);
+
 
     // Use this to check the output of each API call
     cl_int status;  
@@ -121,6 +118,8 @@ int main() {
     
     cl_uint numDevices = 0;
     cl_device_id *devices = NULL;
+    // int platformToUse = 0;
+    int platformToUse = 1;
 
     // Use clGetDeviceIDs() to retrieve the number of 
     // devices present
@@ -138,12 +137,11 @@ int main() {
 
     // Fill in devices with clGetDeviceIDs()
     status = clGetDeviceIDs(
-        platforms[0], 
+        platforms[platformToUse], 
         CL_DEVICE_TYPE_ALL,        
         numDevices, 
         devices, 
         NULL);
-
     //-----------------------------------------------------
     // STEP 3: Create a context
     //----------------------------------------------------- 
@@ -179,28 +177,32 @@ int main() {
     // STEP 5: Create device buffers
     //----------------------------------------------------- 
     
-    cl_mem bufferA;  // Input array on the device
-    cl_mem bufferB;  // Input array on the device
-    cl_mem bufferS;  // Output array on the device
+    cl_mem bufferC;  // cost array on the device
+    cl_mem bufferP;  // Pheromone array on the device
+    cl_mem bufferR;  // Input array on the device
+    cl_mem bufferS;  // Output path from the device
+    cl_mem bufferSC;  // Output cost from the device
 
-    bufferA = clCreateBuffer(
+    // if doing CL_MEM_READ_WRITE
+
+    bufferC = clCreateBuffer(
         context, 
         CL_MEM_READ_ONLY,                         
         datasizeC, 
         NULL, 
         &status);
 
-    bufferB = clCreateBuffer(
+    bufferP = clCreateBuffer(
         context, 
         CL_MEM_READ_ONLY,                         
         datasizeP, 
         NULL, 
         &status);
 
-    bufferS = clCreateBuffer(
+    bufferR = clCreateBuffer(
         context, 
-        CL_MEM_WRITE_ONLY,                 
-        datasizeS, 
+        CL_MEM_READ_ONLY,                         
+        datasizeR, 
         NULL, 
         &status);
 
@@ -208,6 +210,13 @@ int main() {
         context, 
         CL_MEM_WRITE_ONLY,                 
         datasizeS, 
+        NULL, 
+        &status);
+
+    bufferSC = clCreateBuffer(
+        context, 
+        CL_MEM_WRITE_ONLY,                 
+        datasizeSC, 
         NULL, 
         &status);
     
@@ -215,28 +224,35 @@ int main() {
     // STEP 6: Write host data to device buffers
     //----------------------------------------------------- 
     
-    // Use clEnqueueWriteBuffer() to write input array A to
-    // the device buffer bufferA
     status = clEnqueueWriteBuffer(
         cmdQueue, 
-        bufferA, 
+        bufferC, 
         CL_FALSE, 
         0, 
-        datasize,                         
-        A, 
+        datasizeC,                         
+        C, 
         0, 
         NULL, 
         NULL);
     
-    // Use clEnqueueWriteBuffer() to write input array B to 
-    // the device buffer bufferB
     status = clEnqueueWriteBuffer(
         cmdQueue, 
-        bufferB, 
+        bufferP, 
         CL_FALSE, 
         0, 
-        datasize,                                  
-        B, 
+        datasizeP,                                  
+        P, 
+        0, 
+        NULL, 
+        NULL);
+
+    status = clEnqueueWriteBuffer(
+        cmdQueue, 
+        bufferR, 
+        CL_FALSE, 
+        0, 
+        datasizeR,                                  
+        R, 
         0, 
         NULL, 
         NULL);
@@ -270,8 +286,8 @@ int main() {
     cl_kernel kernel = NULL;
 
     // Use clCreateKernel() to create a kernel from the 
-    // vector addition function (named "vecadd")
-    kernel = clCreateKernel(program, "vecadd", &status);
+    // and walking function (named "stroll")
+    kernel = clCreateKernel(program, "stroll", &status);
 
     //-----------------------------------------------------
     // STEP 9: Set the kernel arguments
@@ -284,17 +300,27 @@ int main() {
         kernel, 
         0, 
         sizeof(cl_mem), 
-        &bufferA);
+        &bufferC);
     status |= clSetKernelArg(
         kernel, 
         1, 
         sizeof(cl_mem), 
-        &bufferB);
+        &bufferP);
     status |= clSetKernelArg(
         kernel, 
         2, 
         sizeof(cl_mem), 
-        &bufferC);
+        &bufferR);
+    status |= clSetKernelArg(
+        kernel, 
+        3, 
+        sizeof(cl_mem), 
+        &bufferS);
+    status |= clSetKernelArg(
+        kernel, 
+        4, 
+        sizeof(cl_mem), 
+        &bufferSC);
 
     //-----------------------------------------------------
     // STEP 10: Configure the work-item structure
@@ -307,7 +333,7 @@ int main() {
     // but can be used.
     size_t globalWorkSize[1];    
     // There are 'elements' work-items 
-    globalWorkSize[0] = elements;
+    globalWorkSize[0] = k;
 
     //-----------------------------------------------------
     // STEP 11: Enqueue the kernel for execution
@@ -337,28 +363,18 @@ int main() {
     // to the host output array (C)
     clEnqueueReadBuffer(
         cmdQueue, 
-        bufferC, 
+        bufferSC, 
         CL_TRUE, 
         0, 
-        datasize, 
-        C, 
+        datasizeSC, 
+        SC, 
         0, 
         NULL, 
         NULL);
 
-    // Verify the output
-    bool result = true;
-    for(int i = 0; i < elements; i++) {
-        if(C[i] != i+i) {
-            result = false;
-            break;
-        }
-    }
-    if(result) {
-        printf("Output is correct\n");
-    } else {
-        printf("Output is incorrect\n");
-    }
+    printf("Output is dun 0 %f\n", SC[0]);
+    printf("Output is dun 1 %f\n", SC[1]);
+    printf("Output is dun 2 %f\n", SC[2]);
 
     //-----------------------------------------------------
     // STEP 13: Release OpenCL resources
@@ -368,15 +384,19 @@ int main() {
     clReleaseKernel(kernel);
     clReleaseProgram(program);
     clReleaseCommandQueue(cmdQueue);
-    clReleaseMemObject(bufferA);
-    clReleaseMemObject(bufferB);
     clReleaseMemObject(bufferC);
+    clReleaseMemObject(bufferP);
+    clReleaseMemObject(bufferR);
+    clReleaseMemObject(bufferS);
+    clReleaseMemObject(bufferSC);
     clReleaseContext(context);
 
     // Free host resources
-    free(A);
-    free(B);
     free(C);
+    free(P);
+    free(S);
+    free(SC);
+    free(R);
     free(platforms);
     free(devices);
 }

@@ -12,23 +12,7 @@
 // OpenCL includes
 #include <CL/cl.h>
 
-// OpenCL kernel to perform an element-wise 
-// add of two arrays                        
-const char* programSource =
-"__kernel                                            \n"
-"void vecadd(__global int *A,                        \n"
-"            __global int *B,                        \n"
-"            __global int *C)                        \n"
-"{                                                   \n"
-"                                                    \n"
-"   // Get the work-item’s unique ID                 \n"
-"   int idx = get_global_id(0);                      \n"
-"                                                    \n"
-"   // Add the corresponding locations of            \n"
-"   // 'A' and 'B', and store the result in 'C'.     \n"
-"   C[idx] = A[idx] + B[idx];                        \n"
-"}                                                   \n"
-;
+#define MAX_SOURCE_SIZE (0x100000)  
 
 int main() {
     // This code executes on the OpenCL host
@@ -39,7 +23,7 @@ int main() {
     int *C = NULL;  // Output array
     
     // Elements in each array
-    const int elements = 2048;   
+    const int elements = 3;   
     
     // Compute the size of the data 
     size_t datasize = sizeof(int)*elements;
@@ -53,6 +37,21 @@ int main() {
         A[i] = i;
         B[i] = i;
     }
+
+    FILE *fp;
+    const char fileName[] = "./vecaddKernel.cl";
+    size_t source_size;
+    char *programSource;
+
+    /* Load kernel source file */
+    fp = fopen(fileName, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed to load kernel.\n");    
+        exit(1);
+    }   
+    programSource = (char *)malloc(MAX_SOURCE_SIZE);
+    source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
+    fclose(fp);
 
     // Use this to check the output of each API call
     cl_int status;  
@@ -68,6 +67,7 @@ int main() {
     // platforms
     status = clGetPlatformIDs(0, NULL, &numPlatforms);
  
+ printf("num platformID %d\n", numPlatforms);
     // Allocate enough space for each platform
     platforms =   
         (cl_platform_id*)malloc(
@@ -100,12 +100,15 @@ int main() {
 
     // Fill in devices with clGetDeviceIDs()
     status = clGetDeviceIDs(
-        platforms[0], 
+        platforms[1], 
         CL_DEVICE_TYPE_ALL,        
         numDevices, 
         devices, 
         NULL);
 
+    printf("%s", devices[0]);
+    
+    printf("num D%d\n", numDevices);
     //-----------------------------------------------------
     // STEP 3: Create a context
     //----------------------------------------------------- 
@@ -121,7 +124,6 @@ int main() {
         NULL, 
         NULL, 
         &status);
-    printf("num D%d\n", numDevices);
 
     //-----------------------------------------------------
     // STEP 4: Create a command queue
@@ -309,19 +311,22 @@ int main() {
         NULL);
 
     // Verify the output
-    bool result = true;
-    for(int i = 0; i < elements; i++) {
-        if(C[i] != i+i) {
-            result = false;
-            break;
-        }
-    }
-    if(result) {
-        printf("Output is correct\n");
-    } else {
-        printf("Output is incorrect\n");
-    }
+    // bool result = true;
+    // for(int i = 0; i < elements; i++) {
+    //     if(C[i] != i+i) {
+    //         result = false;
+    //         break;
+    //     }
+    // }
+    // if(result) {
+    //     printf("Output is correct\n");
+    // } else {
+    //     printf("Output is incorrect\n");
+    // }
 
+    printf("Output is dun 0 %d\n", C[0]);
+    printf("Output is dun 1 %d\n", C[1]);
+    printf("Output is dun 2 %d\n", C[2]);
     //-----------------------------------------------------
     // STEP 13: Release OpenCL resources
     //----------------------------------------------------- 
