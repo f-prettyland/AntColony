@@ -21,13 +21,15 @@ Compare:
 -------------
 Discuss ants:
 -------------
-	not using the cost array effectively, recalcing all of this so many times (well depending on k)
+	- not using the cost array effectively, recalcing all of this so many times (well depending on k)
 
-	Use of boolean array to represent visited nodes, since need to visit all and need to look up often is much faster
+	
+
+	- Use of boolean array to represent visited nodes, since need to visit all and need to look up often is much faster
 		does this affect memory? How much?
 		there is code in APPEND if wanna use
 
-	Calc edgeAttraction 
+	- Calc edgeAttraction 
 		Counting how many used
 			Should realloc just to needed nodes? Currently just ignores final x elements
 			Also need second array to map what element means what node

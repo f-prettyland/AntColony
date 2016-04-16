@@ -20,6 +20,7 @@ __kernel void stroll(
 	int nodes = param->Nodes;
 	double alpha = param->Alpha;
 	double beta = param->Beta;
+	int startNode = param->StartNode;
 	
 	//Plus one as should end where began
 	int[nodes+1] solution;
@@ -28,8 +29,8 @@ __kernel void stroll(
 	double solnCost = 0;
 
 	//start at first node
-	solution[solnLength] = StartNode;
-	visited[StartNode] = true;
+	solution[solnLength] = startNode;
+	visited[startNode] = true;
 
 
 	// //length of random is |C[0]| (nodes)
@@ -40,7 +41,7 @@ __kernel void stroll(
 			//must go back to beginning no need to check others
 			solnCost += C[((solution[solnLength])*nodes)+0];
 			solnLength++;
-			solution[solnLength] = StartNode;
+			solution[solnLength] = startNode;
 		}else{
 			//can be -1 as path to self should be 0 (not allowed)
 			double[nodes-1] edgeAttraction;
@@ -75,7 +76,7 @@ __kernel void stroll(
 			solution[solnLength] = edgeAttrMap[chosenPath];
 		}
 	//whilst not at the beginning
-	}while((solution[solnLength]) != StartNode)
+	}while((solution[solnLength]) != startNode)
 
 
 	SC[idx]								= solnCost;

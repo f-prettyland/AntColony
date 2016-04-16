@@ -7,6 +7,9 @@ ants: ants.c
 vecadd: vecadd.c
 	gcc -std=c99 vecadd.c -lOpenCL -o vecadd
 
+test: kernelTest.c
+	gcc -std=c99 kernelTest.c -lOpenCL -o kernelTest
+
 clean:
 	rm -f vecadd *~
 	rm -f ants *~
