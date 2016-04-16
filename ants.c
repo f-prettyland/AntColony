@@ -6,7 +6,7 @@
 
 #define MAX_SOURCE_SIZE (0x100000)
 
-const char fileName[] = "./antKernel-T2.cl";
+const char fileName[] = "./antKernel.cl";
 
 typedef struct Params
 {
@@ -77,7 +77,7 @@ int main() {
 
     // Initialize the random
     for(int j = 0; j < nodes; j++) {
-        P[j] = j;
+        R[j] = j+1;
     }
 
     // todo, calloc this?
@@ -156,8 +156,8 @@ int main() {
     
     cl_uint numDevices = 0;
     cl_device_id *devices = NULL;
-    // int platformToUse = 0;
-    int platformToUse = 1;
+    int platformToUse = 0;
+    // int platformToUse = 1;
 
     // Use clGetDeviceIDs() to retrieve the number of 
     // devices present
@@ -175,7 +175,7 @@ int main() {
 
     // Fill in devices with clGetDeviceIDs()
     status = clGetDeviceIDs(
-        platforms[0], 
+        platforms[platformToUse], 
         CL_DEVICE_TYPE_ALL,        
         numDevices, 
         devices, 
@@ -384,6 +384,22 @@ int main() {
         5, 
         sizeof(cl_mem), 
         &bufferSC);
+
+    status |= clSetKernelArg(
+        kernel,
+        6,
+        (nodes+1)* sizeof(int),
+        NULL);
+    status |= clSetKernelArg(
+        kernel,
+        7,
+        (nodes)* sizeof(bool),
+        NULL);
+    status |= clSetKernelArg(
+        kernel,
+        8,
+        (nodes)* sizeof(double),
+        NULL);
 
     //-----------------------------------------------------
     // STEP 10: Configure the work-item structure

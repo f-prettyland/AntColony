@@ -1,5 +1,11 @@
 Theres something wrong in the do loop...
 
+Not running right? Do you:
+	have __ flags
+	reference correct global id
+	reference correct kernel
+	use correct platform
+
 -------------
 Different parallelisations:
 -------------
@@ -14,6 +20,8 @@ Different parallelisations:
 -------------
 Compare:
 -------------
+	- diff attract-cost functions 
+	- probable edge check for zero case and does no maths, see if this speeds up
 	- different start location should have no diff
 	- using private constant to global const
 		//eeehh, maybe to show off understandinf of openCL
@@ -24,18 +32,18 @@ Discuss ants:
 -------------
 	- not using the cost array effectively, recalcing all of this so many times (well depending on k)
 
-	
+	- attract from cost so can vary what causes attraction
 
 	- Use of boolean array to represent visited nodes, since need to visit all and need to look up often is much faster
 		does this affect memory? How much?
 		there is code in APPEND if wanna use
 
 	- Calc edgeAttraction 
-		Counting how many used
+		Scalable option as takes less space, but with more trivial calculations:
+			Calc all and leave them with scores of 0... This means more iterations of simple maths
+		CANNOT REALLOC therefore pointless: Counting how many used
 			Should realloc just to needed nodes? Currently just ignores final x elements
 			Also need second array to map what element means what node
-		OTHER OPTION:
-			Calc all and leave them with scores of 0... This means more iterations of simple maths
 		
 	Calculate values and sum whilst going through, only use sum in finding of probable edge and means you don't have to divide by sum immmediately after, instead only done when needed
 
