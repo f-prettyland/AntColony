@@ -25,7 +25,7 @@ uint getRandom(double seedSeed, int idx, int bound){
 }
 
 __kernel void stroll(
-			__constant struct Params *param,
+			// __constant struct Params *param,
 			__global double *C,
             __global double *P,
             __global double *R,

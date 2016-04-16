@@ -6,6 +6,7 @@
 
 #define MAX_SOURCE_SIZE (10000)  
 
+const char fileName[] = "./antKernel-T2.cl";
 
 void make2DInt(int** inArr, int nodes) {
     inArr = (int**) malloc(nodes*sizeof(int*));
@@ -74,7 +75,6 @@ int main() {
 
 
     FILE *fp;
-    const char fileName[] = "./antKernel-T1.cl";
     size_t source_size;
     char *programSource;
 

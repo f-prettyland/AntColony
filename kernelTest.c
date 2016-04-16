@@ -11,15 +11,15 @@ typedef struct Params
     double Beta;
 } Params;
 
-int getProbableEdgeRandomly(uint probab, double* edgeProb, int edgeProbSize, double sumEdgeProbs){
-	double sum = 0;
-	for (int i = 0; i < edgeProbSize; ++i)
-	{
-		sum+=edgeProb[i];
-		if(probab<((edgeProb[i]/sumEdgeProbs)*bound))
-			return i
-	}
-	return (edgeProbSize-1);
+int getProbableEdgeRandomly(int probab, double* edgeProb, int edgeProbSize, double sumEdgeProbs, int bound){
+    double sum = 0;
+    for (int i = 0; i < edgeProbSize; ++i){
+        sum+=edgeProb[i];
+        if(probab<((edgeProb[i]/sumEdgeProbs)*bound)){
+            return i;
+        }
+    }
+    return (edgeProbSize-1);
 }
 
 uint getRandom(double seedSeed, int idx, int bound){
@@ -93,7 +93,7 @@ void stroll(
 				}
 			}
 			double freeWill = getRandom(R[solnLength], idx, bound);
-			int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, numPossPaths, sumPossEdgeAttract);
+			int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, numPossPaths, sumPossEdgeAttract,bound);
 			solnCost +=  C[((solution[solnLength])*nodes)+edgeAttrMap[chosenPath]];
 
 			visited[edgeAttrMap[chosenPath]] = true;

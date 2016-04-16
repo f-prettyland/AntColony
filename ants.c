@@ -4,9 +4,9 @@
 
 #include <CL/cl.h>
 
-#define MAX_SOURCE_SIZE (10000)  
+#define MAX_SOURCE_SIZE (0x100000)
 
-const char fileName[] = "./antKernel-T1.cl";
+const char fileName[] = "./antKernel-T2.cl";
 
 typedef struct Params
 {
