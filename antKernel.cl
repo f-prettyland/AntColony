@@ -6,10 +6,10 @@ typedef struct Params
     double Beta;
 } Params;
 
-int getProbableEdgeRandomly(int probab, __local double * edgeAttraction, int edgeProbSize, double sumEdgeProbs, int bound){
+int getProbableEdgeRandomly(double probab, __private double * edgeAttraction, int edgeProbSize, double sumEdgeProbs){
     double sum = 0;
     for (int i = 0; i < edgeProbSize; i++){
-        sum+=(edgeAttraction[i]/sumEdgeProbs)*bound;
+        sum+=(edgeAttraction[i]/sumEdgeProbs);
 	    if(probab<(sum)){
 	        return i;
 	    }
@@ -18,11 +18,12 @@ int getProbableEdgeRandomly(int probab, __local double * edgeAttraction, int edg
     // return 0;
 }
 
-int getRandom(double seedSeed, int idx, int bound){
+double getRandom(double seedSeed, int idx){
+    double bound = 1000;
     long seed = idx+seedSeed;
     seed = (seed * 0x5DEECE66DL + 0xBL) & ((1L << 48) - 1);
-    int result = (seed >> 16)%bound;
-    return result;
+    int result = (seed >> 16)%((int)bound);
+    return (result/bound);
 }
 
 double attractFromCost(double cost){
@@ -35,12 +36,10 @@ __kernel void stroll(
             __global double *P,
             __global double *R,
             __global int *S,
-            __global double *SC,
-            __local int * solution,
-            __local bool * visited,
-            __local double * edgeAttraction
+            __global double *SC
             )
 // void stroll(
+            // int idx,
 //             struct Params *param,
 //             double *C,
 //             double *P,
@@ -51,7 +50,12 @@ __kernel void stroll(
 
     int idx = get_global_id(0);
     // int idx = 0;
-    const int bound = 1000;
+
+    __private int solution[6];
+    __private bool visited[5];
+    __private double edgeAttraction[5];
+    solution[4]=23;
+    solution[5]=3;
 
     int nodes = param->Nodes;
     double alpha = param->Alpha;
@@ -61,16 +65,24 @@ __kernel void stroll(
     int solnLength = 0;
     double solnCost = 0;
 
+    for (int i = 0; i < 5; ++i)
+    {
+        visited[i]=false;
+    }
+
     //start at first node
     solution[solnLength] = startNode;
     visited[startNode] = true;
+
 
     do{
     	//if it has gone to all the nodes, but is not at the beginning
     	if(solnLength==(nodes-1)){
     		//ASSUMPTION THAT GRAPH IS CONNECTED TAKES PLACE HERE CAN CHECK FOR 0 THEN NEVER TAKE THAT PATH AGAIN
     		//must go back to beginning no need to check others
+
     		solnCost += C[((solution[solnLength])*nodes)+0];
+
     		solnLength++;
     		solution[solnLength] = startNode;
     	}else{
@@ -80,8 +92,7 @@ __kernel void stroll(
     		// int edgeAttrMap[nodes-1];
     		// int numPossPaths = 0;
 
-    		double sumPossEdgeAttract = 0; 
-
+    		double sumPossEdgeAttract = 0;
 
     		for (int i = 0; i < nodes; ++i)
     		{
@@ -89,19 +100,18 @@ __kernel void stroll(
     			//If there is an edge there and haven't visited before
     			if(possibleEdgeCost != 0 && !visited[i]){
     				//Non-normalised attractiveness of edge
-    				edgeAttraction[i] = (alpha*possibleEdgeCost)+(beta*attractFromCost(P[((solution[solnLength])*nodes)+i]));
+                    edgeAttraction[i] = (alpha*attractFromCost(possibleEdgeCost))+(beta*(P[((solution[solnLength])*nodes)+i]));
     				//add to sum for nomarlisation later
-    				sumPossEdgeAttract += possibleEdgeCost;
+    				sumPossEdgeAttract += edgeAttraction[i];
     			}else{
     				// already seen or zero cost
     				edgeAttraction[i] = 0;
     			}
     		}
     		
-    		int freeWill = getRandom(R[solnLength], idx, bound);
-    		int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, nodes, sumPossEdgeAttract, bound);
-    		// int chosenPath = 0;
-    		solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
+    		double freeWill = getRandom(R[solnLength], idx);
+    		int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, nodes, sumPossEdgeAttract);
+            solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
 
     		visited[chosenPath] = true;
     		
@@ -112,9 +122,13 @@ __kernel void stroll(
     }while((solution[solnLength]) != startNode);
 
 
-    SC[idx]								= solnCost;
-    //needs fix
-    S[idx*sizeof(int)*(nodes+1)]		= solution;
+    // SC[idx]                             = 10.0;
+    // // solnCost += 5;
+    SC[idx]                             = solnCost;
+    for (int p = 0; p < nodes+1; p++)
+    {
+        S[(idx*(nodes+1))+p] = solution[p];
+    }
 
 }
 

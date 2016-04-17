@@ -1,4 +1,4 @@
-Theres something wrong in the do loop...
+REPLACE ARRAY DEFN
 
 Not running right? Do you:
 	have __ flags
@@ -22,6 +22,7 @@ Compare:
 -------------
 	- diff attract-cost functions 
 	- probable edge check for zero case and does no maths, see if this speeds up
+	- compiling with constants
 	- different start location should have no diff
 	- using private constant to global const
 		//eeehh, maybe to show off understandinf of openCL
@@ -51,6 +52,33 @@ Discuss ants:
 		Using Xorshift
 		https://stackoverflow.com/questions/9912143/how-to-get-a-random-number-in-opencl
 
+-------------
+Discuss Phere
+-------------
+	Our AS uses
+		1/C as our g(ij)
+
+	http://research.ijcaonline.org/volume97/number10/pxc3897353.pdf
+		Defines difference between Ant System and Ant Colony System [ACS has global/local]
+
+
+	----
+	ACS
+	----
+	H.-B.    Duan,    Ant    Colony    Algorithms: Theory  and  Applications.  Beijing:  Science Press, 2005
+		Global is plussin
+		Local is evap
+			Local should be done IMMEDIATELY after edge navigation
+
+	http://people.idsia.ch/~luca/acs-bio97.pdf
+			Only best route deposit pheremone
+		Global update: Inversely proportional to length of tour - The shorter the tour the greater the amount of pheromone deposited on edge
+
+		Use local updating to evaporate a path WHEN CHOSEN BY AN ANT
+
+	http://www.ijera.com/papers/Vol4_issue6/Version%203/K046036367.pdf
+			Only best route deposit pheremone
+		Global - inverse proportional to evap const (p/L)
 
 -------------
 Discuss generic:
@@ -63,13 +91,12 @@ Discuss generic:
 
 	Need to beat O(n!) complexity to be better than all permutations
 
-
+	pseudo-random walks are like that seen in Q-learning (Watkins and Dayan, 1992)
+		then with pheremone evap encourages more exploration
 
 -------------
 TODO
 -------------
-	When searching prev nodes use hash set
-
 	Conditional path taking using PCG as random generator
 		\cite{neill}
 		http://www.pcg-random.org/paper.html

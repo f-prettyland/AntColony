@@ -10,10 +10,11 @@ typedef struct Params
     double Beta;
 } Params;
 
-int getProbableEdgeRandomly(int probab, double* edgeProb, int edgeProbSize, double sumEdgeProbs, int bound){
+
+int getProbableEdgeRandomly(double probab, double * edgeAttraction, int edgeProbSize, double sumEdgeProbs){
     double sum = 0;
-    for (int i = 0; i < edgeProbSize; ++i){
-        sum+=(edgeProb[i]/sumEdgeProbs)*bound;
+    for (int i = 0; i < edgeProbSize; i++){
+        sum+=(edgeAttraction[i]/sumEdgeProbs);
         if(probab<(sum)){
             return i;
         }
@@ -22,11 +23,12 @@ int getProbableEdgeRandomly(int probab, double* edgeProb, int edgeProbSize, doub
     // return 0;
 }
 
-int getRandom(double seedSeed, int idx, int bound){
+double getRandom(double seedSeed, int idx){
+    double bound = 1000;
     long seed = idx+seedSeed;
     seed = (seed * 0x5DEECE66DL + 0xBL) & ((1L << 48) - 1);
-    int result = (seed >> 16)%bound;
-    return result;
+    int result = (seed >> 16)%((int)bound);
+    return (result/bound);
 }
 
 double attractFromCost(double cost){
@@ -39,92 +41,114 @@ double attractFromCost(double cost){
 //             __global double *P,
 //             __global double *R,
 //             __global int *S,
-//             __global double *SC,
-//             __local int * solution,
-//             __local bool * visited,
-//             __local double * edgeAttraction
+//             __global double *SC
+//             // __local int * solution,
+//             // __local bool * visited,
+//             // __local double * edgeAttraction
 //             )
 void stroll(
+            int idx,
             struct Params *param,
             double *C,
             double *P,
             double *R,
             int *S,
-            double *SC,
-            int * solution,
-            bool * visited,
-            double * edgeAttraction
-            )
+            double *SC)
 {
 
     // int idx = get_global_id(0);
-    int idx = 0;
+    // int idx = 0;
     const int bound = 1000;
 
-        int nodes = param->Nodes;
-        double alpha = param->Alpha;
-        double beta = param->Beta;
-        int startNode = param->StartNode;
-        
-        int solnLength = 0;
-        double solnCost = 0;
-
-        //start at first node
-        solution[solnLength] = startNode;
-        visited[startNode] = true;
-
-        do{
-            //if it has gone to all the nodes, but is not at the beginning
-            if(solnLength==(nodes-1)){
-                //ASSUMPTION THAT GRAPH IS CONNECTED TAKES PLACE HERE CAN CHECK FOR 0 THEN NEVER TAKE THAT PATH AGAIN
-                //must go back to beginning no need to check others
-                solnCost += C[((solution[solnLength])*nodes)+0];
-                solnLength++;
-                solution[solnLength] = startNode;
-            }else{
-                //can be -1 as path to self should be 0 (not allowed)
-
-                //as not all nodes are in edge attraction need to map from place to place
-                // int edgeAttrMap[nodes-1];
-                // int numPossPaths = 0;
-
-                double sumPossEdgeAttract = 0; 
+     int solution[6];
+     bool visited[5];
+     double edgeAttraction[5];
 
 
-                for (int i = 0; i < nodes; ++i)
-                {
-                    double possibleEdgeCost = C[((solution[solnLength])*nodes)+i];
-                    //If there is an edge there and haven't visited before
-                    if(possibleEdgeCost != 0 && !visited[i]){
-                        //Non-normalised attractiveness of edge
-                        edgeAttraction[i] = (alpha*possibleEdgeCost)+(beta*attractFromCost(P[((solution[solnLength])*nodes)+i]));
-                        //add to sum for nomarlisation later
-                        sumPossEdgeAttract += possibleEdgeCost;
-                    }else{
-                        // already seen or zero cost
-                        edgeAttraction[i] = 0;
-                    }
+    int nodes = param->Nodes;
+    double alpha = param->Alpha;
+    double beta = param->Beta;
+    int startNode = param->StartNode;
+    
+    int solnLength = 0;
+    double solnCost = 0;
+
+    //start at first node
+    solution[solnLength] = startNode;
+    visited[startNode] = true;
+
+
+    do{
+        //if it has gone to all the nodes, but is not at the beginning
+        if(solnLength==(nodes-1)){
+            //ASSUMPTION THAT GRAPH IS CONNECTED TAKES PLACE HERE CAN CHECK FOR 0 THEN NEVER TAKE THAT PATH AGAIN
+            //must go back to beginning no need to check others
+            solnCost += C[((solution[solnLength])*nodes)+0];
+            solnLength++;
+            solution[solnLength] = startNode;
+        }else{
+            //can be -1 as path to self should be 0 (not allowed)
+
+            //as not all nodes are in edge attraction need to map from place to place
+            // int edgeAttrMap[nodes-1];
+            // int numPossPaths = 0;
+
+            double sumPossEdgeAttract = 0; 
+
+
+            for (int i = 0; i < nodes; ++i)
+            {
+                double possibleEdgeCost = C[((solution[solnLength])*nodes)+i];
+                //If there is an edge there and haven't visited before
+                if(possibleEdgeCost != 0 && !visited[i]){
+                    //Non-normalised attractiveness of edge
+                    edgeAttraction[i] = (alpha*attractFromCost(possibleEdgeCost))+(beta*(P[((solution[solnLength])*nodes)+i]));
+                    //add to sum for nomarlisation later
+                    sumPossEdgeAttract += edgeAttraction[i];
+                }else{
+                    // already seen or zero cost
+                    edgeAttraction[i] = 0;
                 }
-                
-                int freeWill = getRandom(R[solnLength], idx, bound);
-                int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, nodes, sumPossEdgeAttract, bound);
-                // int chosenPath = 0;
-                solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
-
-                visited[chosenPath] = true;
-                
-                solnLength++;
-                solution[solnLength] = chosenPath;
             }
-        //whilst not at the beginning
-        }while((solution[solnLength]) != startNode);
+            
+            double freeWill = getRandom(R[solnLength], idx);
+            int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, nodes, sumPossEdgeAttract);
+            // int chosenPath = 0;
+            // solnCost += 5;
+                // solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
+            if(sumPossEdgeAttract==0){
+                solnCost +=  0;
+                S[(idx*(nodes+1))] = solution[solnLength];
+                for (int p = 1; p < nodes+1; p++)
+                {
+                    // S[(idx*(nodes+1))+p] = (int)floor(edgeAttraction[p]);
+                    S[(idx*(nodes+1))+p] = 3;
+                }
+                SC[idx]                             = 312;
+                return;
+
+            }else{
+                solnCost +=  1;
+
+            }
+
+            visited[chosenPath] = true;
+            
+            solnLength++;
+            solution[solnLength] = chosenPath;
+        }
+    //whilst not at the beginning
+    }while((solution[solnLength]) != startNode);
 
 
-        SC[idx]                             = solnCost;
-        //needs fix
-        S[idx*sizeof(int)*(nodes+1)]        = solution;
+    // SC[idx]                             = 10.0;
+    // // solnCost += 5;
+    SC[idx]                             = solnCost;
+    for (int p = 0; p < nodes+1; p++)
+    {
+        S[(idx*(nodes+1))+p] = solution[p];
+    }
 
-        SC[idx] = 62.0; 
 }
 
 int main() {
@@ -218,15 +242,14 @@ int main() {
     C[(4*nodes)+3]=6;
 
 
-    int solution[nodes+1];
-    bool visited[nodes];
-
-    double edgeAttraction[nodes];
-
-    stroll(&params,C,P,R,S,SC,solution,visited,edgeAttraction);
-
-    for (int i = 0; i < nodes+1; ++i)
+    for (int j = 0; j < k; ++j)
     {
-        printf("%d\n", solution[i]);
+        stroll(j, &params,C,P,R,S,SC);
+        printf("Output %d is dun %d, score: %f\n",0, j, SC[j]);
+        for (int p = 0; p < nodes+1; ++p)
+        {
+            printf("%d\n", S[(j*(nodes+1))+p]);
+        }
+        printf("\n");
     }
 }
