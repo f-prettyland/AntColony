@@ -26,14 +26,14 @@ void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nod
         }
     }
 
-    //drop pheremones proportional to success of path
+    // drop pheremones proportional to success of path
     for (int i = 0; i < k; ++i)
     {
         for (int j = 0; j < nodes; ++j)
         {
             int citysrc = S[(i*k)+j];
             int cityDst = S[(i*k)+j+1];
-            P[(citysrc*nodes)+cityDst] += (1.f/SC[k]);
+            P[(citysrc*nodes)+cityDst] += (1.f/SC[i]);
         }
     }
 }
@@ -55,9 +55,9 @@ int main() {
     // Nodes to represent in each array
     const int nodes = 5;
     // Constant to start pheromone on
-    const double pherStart = 1;
+    const double pherStart = 0.8;
 
-    const double evap = 1;
+    const double evap = 0.5;
 
     Params params;
     params.Nodes = nodes;
@@ -295,7 +295,7 @@ int main() {
 
     cl_kernel kernel = NULL;
 
-    for (int i = 0; i < 1; ++i)
+    for (int i = 0; i < 2; ++i)
     {
         //-----------------------------------------------------
         // STEP 6: Write host data to device buffers
@@ -501,10 +501,30 @@ int main() {
             printf("\n");
         }
 
+        printf("%s\n", "PHEREBEFORE----------------------");
+        for (int j = 0; j < nodes; ++j)
+        {
+            for (int p = 0; p < nodes; ++p)
+            {
+                printf("%f ", P[(j*(nodes))+p]);
+            }
+            printf("\n");
+        }
 
-        
+        updatePheremones(S, P, evap, SC, k, nodes);
 
-        // updatePheremones(S, P, evap, SC, k, nodes);
+
+        printf("%s\n", "PHEREAFTER-----------------------");
+        for (int j = 0; j < nodes; ++j)
+        {
+            for (int p = 0; p < nodes; ++p)
+            {
+                printf("%f ", P[(j*(nodes))+p]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+        printf("\n");
     }
     
 

@@ -4,6 +4,9 @@ all: vecadd
 ants: ants.c
 	gcc -std=c99 ants.c -lOpenCL -o ants
 
+antsg: ants.c
+	gcc -std=c99 ants.c -lOpenCL -o ants -g
+
 vecadd: vecadd.c
 	gcc -std=c99 vecadd.c -lOpenCL -o vecadd
 
