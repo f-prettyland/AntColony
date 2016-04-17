@@ -66,7 +66,7 @@ int main() {
     //cost weighting
     params.Alpha = 1;
     //pheromone weighting
-    params.Beta = 1;
+    params.Beta = 10;
     
     // Compute the size of the data 
     size_t datasizeParams   = sizeof(Params);
@@ -300,7 +300,7 @@ int main() {
         //-----------------------------------------------------
         // STEP 6: Write host data to device buffers
         //----------------------------------------------------- 
-        
+
         status = clEnqueueWriteBuffer(
             cmdQueue, 
             bufferC, 

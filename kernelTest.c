@@ -10,7 +10,6 @@ typedef struct Params
     double Beta;
 } Params;
 
-
 int getProbableEdgeRandomly(double probab, double * edgeAttraction, int edgeProbSize, double sumEdgeProbs){
     double sum = 0;
     for (int i = 0; i < edgeProbSize; i++){
@@ -42,9 +41,6 @@ double attractFromCost(double cost){
 //             __global double *R,
 //             __global int *S,
 //             __global double *SC
-//             // __local int * solution,
-//             // __local bool * visited,
-//             // __local double * edgeAttraction
 //             )
 void stroll(
             int idx,
@@ -57,13 +53,12 @@ void stroll(
 {
 
     // int idx = get_global_id(0);
-    // int idx = 0;
-    const int bound = 1000;
-
-     int solution[6];
-     bool visited[5];
-     double edgeAttraction[5];
-
+ 
+    int solution[6];
+    bool visited[5];
+    double edgeAttraction[5];
+    solution[4]=23;
+    solution[5]=3;
 
     int nodes = param->Nodes;
     double alpha = param->Alpha;
@@ -72,6 +67,11 @@ void stroll(
     
     int solnLength = 0;
     double solnCost = 0;
+
+    for (int i = 0; i < 5; ++i)
+    {
+        visited[i]=false;
+    }
 
     //start at first node
     solution[solnLength] = startNode;
@@ -83,7 +83,9 @@ void stroll(
         if(solnLength==(nodes-1)){
             //ASSUMPTION THAT GRAPH IS CONNECTED TAKES PLACE HERE CAN CHECK FOR 0 THEN NEVER TAKE THAT PATH AGAIN
             //must go back to beginning no need to check others
+
             solnCost += C[((solution[solnLength])*nodes)+0];
+
             solnLength++;
             solution[solnLength] = startNode;
         }else{
@@ -93,8 +95,7 @@ void stroll(
             // int edgeAttrMap[nodes-1];
             // int numPossPaths = 0;
 
-            double sumPossEdgeAttract = 0; 
-
+            double sumPossEdgeAttract = 0;
 
             for (int i = 0; i < nodes; ++i)
             {
@@ -113,24 +114,7 @@ void stroll(
             
             double freeWill = getRandom(R[solnLength], idx);
             int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, nodes, sumPossEdgeAttract);
-            // int chosenPath = 0;
-            // solnCost += 5;
-                // solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
-            if(sumPossEdgeAttract==0){
-                solnCost +=  0;
-                S[(idx*(nodes+1))] = solution[solnLength];
-                for (int p = 1; p < nodes+1; p++)
-                {
-                    // S[(idx*(nodes+1))+p] = (int)floor(edgeAttraction[p]);
-                    S[(idx*(nodes+1))+p] = 3;
-                }
-                SC[idx]                             = 312;
-                return;
-
-            }else{
-                solnCost +=  1;
-
-            }
+            solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
 
             visited[chosenPath] = true;
             
@@ -151,10 +135,33 @@ void stroll(
 
 }
 
+void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nodes) {
+    //evaporate
+    for (int i = 0; i < k; ++i)
+    {
+        for (int j = 0; j < nodes; ++j)
+        {
+            P[(i*nodes)+j] = ((1-evap)*P[(i*nodes)+j]);
+        }
+    }
+
+    // drop pheremones proportional to success of path
+    for (int i = 0; i < k; ++i)
+    {
+        for (int j = 0; j < nodes; ++j)
+        {
+            int citysrc = S[(i*k)+j];
+            int cityDst = S[(i*k)+j+1];
+            P[(citysrc*nodes)+cityDst] += (1.f/SC[i]);
+        }
+    }
+}
+
 int main() {
     // This code executes on the OpenCL host
     const int k = 5;
 
+    const double evap = 0.5;
     // Host data
     double *C   = NULL;  // Cost array
     double *P   = NULL;  // Pheromone array
@@ -177,7 +184,7 @@ int main() {
     //cost weighting
     params.Alpha = 1;
     //pheromone weighting
-    params.Beta = 1;
+    params.Beta = 10;
     
     // Compute the size of the data 
     size_t datasizeParams   = sizeof(Params);
@@ -241,15 +248,43 @@ int main() {
     C[(4*nodes)+2]=9;
     C[(4*nodes)+3]=6;
 
-
-    for (int j = 0; j < k; ++j)
+    int iterations = 3;
+    for (int q = 0; q < iterations; ++q)
     {
-        stroll(j, &params,C,P,R,S,SC);
-        printf("Output %d is dun %d, score: %f\n",0, j, SC[j]);
-        for (int p = 0; p < nodes+1; ++p)
+        for (int j = 0; j < k; ++j)
         {
-            printf("%d\n", S[(j*(nodes+1))+p]);
+            stroll(j, &params,C,P,R,S,SC);
+            printf("Output %d is dun %d, score: %f\n",q, j, SC[j]);
+            for (int p = 0; p < nodes+1; ++p)
+            {
+                printf("%d\n", S[(j*(nodes+1))+p]);
+            }
+            printf("\n");
         }
+
+        printf("%s\n", "PHEREBEFORE----------------------");
+        for (int j = 0; j < nodes; ++j)
+        {
+            for (int p = 0; p < nodes; ++p)
+            {
+                printf("%f ", P[(j*(nodes))+p]);
+            }
+            printf("\n");
+        }
+
+        updatePheremones(S, P, evap, SC, k, nodes);
+
+
+        printf("%s\n", "PHEREAFTER-----------------------");
+        for (int j = 0; j < nodes; ++j)
+        {
+            for (int p = 0; p < nodes; ++p)
+            {
+                printf("%f ", P[(j*(nodes))+p]);
+            }
+            printf("\n");
+        }
+        printf("\n");
         printf("\n");
     }
 }

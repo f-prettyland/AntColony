@@ -49,7 +49,6 @@ __kernel void stroll(
 {
 
     int idx = get_global_id(0);
-    // int idx = 0;
 
     __private int solution[6];
     __private bool visited[5];
