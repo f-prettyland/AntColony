@@ -1,12 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "BorrowedFunc.h"
 
 #include <CL/cl.h>
 
 #define MAX_SOURCE_SIZE (0x100000)
+#define MAX_NODES_DIGITS (15)
 
 const char fileName[] = "./antKernel.cl";
+const char nodeReplace[] = "NODESIZE";
+const char nodePlusReplace[] = "NODESIZEPLUS1";
 
 typedef struct Params
 {
@@ -55,7 +59,7 @@ int main() {
     // Nodes to represent in each array
     const int nodes = 5;
     // Constant to start pheromone on
-    const double pherStart = 0.8;
+    const double pherStart = 0.2;
 
     const double evap = 0.5;
 
@@ -66,7 +70,7 @@ int main() {
     //cost weighting
     params.Alpha = 1;
     //pheromone weighting
-    params.Beta = 10;
+    params.Beta = 1;
     
     // Compute the size of the data 
     size_t datasizeParams   = sizeof(Params);
@@ -142,8 +146,22 @@ int main() {
     }   
     programSource = (char *)malloc(MAX_SOURCE_SIZE);
     source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
-    fclose(fp);
 
+    char strNodes[MAX_NODES_DIGITS];
+    sprintf(strNodes, "%d", (nodes+1));
+    char *replaceOut;
+    replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
+    while(replaceOut != NULL){
+        programSource = replaceOut;
+        replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
+    }
+    sprintf(strNodes, "%d", nodes);
+    replaceOut = replace_str(programSource, nodeReplace, strNodes);
+    while(replaceOut != NULL){
+        programSource = replaceOut;
+        replaceOut = replace_str(programSource, nodeReplace, strNodes);
+    }
+    fclose(fp);
 
     // Use this to check the output of each API call
     cl_int status;  
@@ -174,14 +192,16 @@ int main() {
     
     cl_uint numDevices = 0;
     cl_device_id *devices = NULL;
-    // int platformToUse = 0;
-    int platformToUse = 1;
+    int platformToUse = 0;
+    // int platformToUse = 1;
+    cl_device_type dType = CL_DEVICE_TYPE_ALL;
+    // cl_device_type dType = CL_DEVICE_TYPE_GPU;
 
     // Use clGetDeviceIDs() to retrieve the number of 
     // devices present
     status = clGetDeviceIDs(
-        platforms[platformToUse], 
-        CL_DEVICE_TYPE_ALL, 
+        platforms[0], 
+        dType, 
         0, 
         NULL, 
         &numDevices);
@@ -191,10 +211,12 @@ int main() {
         (cl_device_id*)malloc(
             numDevices*sizeof(cl_device_id));
 
+    printf("NUM %d\n", numDevices);
+
     // Fill in devices with clGetDeviceIDs()
     status = clGetDeviceIDs(
         platforms[platformToUse], 
-        CL_DEVICE_TYPE_ALL,        
+        dType,        
         numDevices, 
         devices, 
         NULL);
@@ -284,8 +306,47 @@ int main() {
         NULL, 
         &status);
 
+    //-----------------------------------------------------
+    // STEP 6: Write host data to device buffers
+    //----------------------------------------------------- 
+
+    status = clEnqueueWriteBuffer(
+        cmdQueue, 
+        bufferC, 
+        CL_FALSE, 
+        0, 
+        datasizeC,                         
+        C, 
+        0, 
+        NULL, 
+        NULL);
 
 
+    status = clEnqueueWriteBuffer(
+        cmdQueue, 
+        bufferR, 
+        CL_FALSE, 
+        0, 
+        datasizeR,                                  
+        R, 
+        0, 
+        NULL, 
+        NULL);
+
+    status = clEnqueueWriteBuffer(
+        cmdQueue, 
+        bufferParam, 
+        CL_TRUE, 
+        0, 
+        datasizeParams,                                  
+        &params, 
+        0, 
+        NULL, 
+        NULL);
+
+    //-----------------------------------------------------
+    // STEP 7: Create and compile the program
+    //----------------------------------------------------- 
     cl_program program = clCreateProgramWithSource(
         context, 
         1, 
@@ -293,25 +354,19 @@ int main() {
         NULL, 
         &status);
 
+    status = clBuildProgram(
+        program, 
+        numDevices, 
+        devices, 
+        NULL, 
+        NULL, 
+        NULL);
+
     cl_kernel kernel = NULL;
-
-    for (int i = 0; i < 2; ++i)
+    
+    for (int i = 0; i < 4; ++i)
     {
-        //-----------------------------------------------------
-        // STEP 6: Write host data to device buffers
-        //----------------------------------------------------- 
 
-        status = clEnqueueWriteBuffer(
-            cmdQueue, 
-            bufferC, 
-            CL_FALSE, 
-            0, 
-            datasizeC,                         
-            C, 
-            0, 
-            NULL, 
-            NULL);
-        
         status = clEnqueueWriteBuffer(
             cmdQueue, 
             bufferP, 
@@ -323,44 +378,6 @@ int main() {
             NULL, 
             NULL);
 
-        status = clEnqueueWriteBuffer(
-            cmdQueue, 
-            bufferR, 
-            CL_FALSE, 
-            0, 
-            datasizeR,                                  
-            R, 
-            0, 
-            NULL, 
-            NULL);
-
-        status = clEnqueueWriteBuffer(
-            cmdQueue, 
-            bufferParam, 
-            CL_TRUE, 
-            0, 
-            datasizeParams,                                  
-            &params, 
-            0, 
-            NULL, 
-            NULL);
-
-        //-----------------------------------------------------
-        // STEP 7: Create and compile the program
-        //----------------------------------------------------- 
-         
-        // Create a program using clCreateProgramWithSource()
-        
-
-        // Build (compile) the program for the devices with
-        // clBuildProgram()
-        status = clBuildProgram(
-            program, 
-            numDevices, 
-            devices, 
-            NULL, 
-            NULL, 
-            NULL);
        
         //-----------------------------------------------------
         // STEP 8: Create the kernel
@@ -409,39 +426,11 @@ int main() {
             sizeof(cl_mem), 
             &bufferSC);
 
-        // status |= clSetKernelArg(
-        //     kernel,
-        //     6,
-        //     (nodes+1)* sizeof(int),
-        //     NULL);
-        // status |= clSetKernelArg(
-        //     kernel,
-        //     7,
-        //     (nodes)* sizeof(bool),
-        //     NULL);
-        // status |= clSetKernelArg(
-        //     kernel,
-        //     8,
-        //     (nodes)* sizeof(double),
-        //     NULL);
-
         //-----------------------------------------------------
         // STEP 10: Configure the work-item structure
-        //----------------------------------------------------- 
-        
-        // Define an index space (global work size) of work 
-        // items for 
-        // execution. A workgroup size (local work size) is not 
-        // required, 
-        // but can be used.
-        // size_t globalWorkSize[k];    
+        //-----------------------------------------------------   
         size_t globalWorkSize[1];    
-        // There are 'elements' work-items 
         globalWorkSize[0] = k;
-        // for (int i = 0; i < k; ++i)
-        // {
-        //     globalWorkSize[i] = 1;
-        // }
 
         //-----------------------------------------------------
         // STEP 11: Enqueue the kernel for execution
@@ -462,6 +451,7 @@ int main() {
             NULL, 
             NULL);
 
+        clFinish(cmdQueue);
         //-----------------------------------------------------
         // STEP 12: Read the output buffer back to the host
         //----------------------------------------------------- 

@@ -50,11 +50,9 @@ __kernel void stroll(
 
     int idx = get_global_id(0);
 
-    __private int solution[6];
-    __private bool visited[5];
-    __private double edgeAttraction[5];
-    solution[4]=23;
-    solution[5]=3;
+    __private int solution[NODESIZEPLUS1];
+    __private bool visited[NODESIZE];
+    __private double edgeAttraction[NODESIZE];
 
     int nodes = param->Nodes;
     double alpha = param->Alpha;
@@ -99,7 +97,7 @@ __kernel void stroll(
     			//If there is an edge there and haven't visited before
     			if(possibleEdgeCost != 0 && !visited[i]){
     				//Non-normalised attractiveness of edge
-                    edgeAttraction[i] = (alpha*attractFromCost(possibleEdgeCost))+(beta*(P[((solution[solnLength])*nodes)+i]));
+                    edgeAttraction[i] = pow(attractFromCost(possibleEdgeCost),alpha)*pow((P[((solution[solnLength])*nodes)+i]),beta);
     				//add to sum for nomarlisation later
     				sumPossEdgeAttract += edgeAttraction[i];
     			}else{

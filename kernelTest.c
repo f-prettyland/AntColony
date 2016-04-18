@@ -184,7 +184,7 @@ int main() {
     //cost weighting
     params.Alpha = 1;
     //pheromone weighting
-    params.Beta = 10;
+    params.Beta = 100;
     
     // Compute the size of the data 
     size_t datasizeParams   = sizeof(Params);
