@@ -5,8 +5,6 @@
 #include "BorrowedFunc.h"
 #include "Structure.h"
 
-
-
 int k;
 double evap;
 int maxIter;
@@ -64,8 +62,6 @@ void handleArguments(int argc, char *argv[]){
     }
 }
 
-
-
 void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nodes) {
     //evaporate
     for (int i = 0; i < k; ++i)
@@ -88,41 +84,7 @@ void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nod
     }
 }
 
-void initialiseDatastructures(){
-    if(pherStart==-1){
-        //perform random walk
-        pherStart=0.5;
-    }
-
-    // Compute the size of the data 
-    datasizeParams   = sizeof(Params);
-    datasizeC    = sizeof(double)*nodes*nodes;
-    datasizeP    = sizeof(double)*nodes*nodes;
-    //Need to make a decision at each node so need a random seed at each one of the
-    datasizeR    = sizeof(double)*nodes;
-    datasizeS    = sizeof(int)*(nodes+1)*k;
-    datasizeSC   = sizeof(double)*k;
-
-    // Allocate space for input/output data
-    C   = (double*)malloc(datasizeC);
-    P   = (double*)malloc(datasizeP);
-    R   = (double*)malloc(datasizeR);
-    // S   = (int*)malloc(datasizeS);
-    S   = (int*)calloc ((nodes+1)*k, sizeof(int));
-    SC  = (double*)malloc(datasizeSC);
-
-    // Initialize the input pheromones
-    for(int j = 0; j < nodes; j++) {
-        for(int i = 0; i < nodes; i++) {
-            P[(j*nodes)+i] = pherStart;
-        }
-    }
-
-    // Initialize the random
-    for(int j = 0; j < nodes; j++) {
-        R[j] = j+123;
-    }
-
+void createGraph(){
     // todo, calloc this?
     for(int j = 0; j < nodes; j++) {
         for(int i = 0; i < nodes; i++) {
@@ -154,9 +116,75 @@ void initialiseDatastructures(){
     C[(4*nodes)+1]=8;
     C[(4*nodes)+2]=9;
     C[(4*nodes)+3]=6;
+}
 
-    
+void initialiseRandom(){
+    // Initialize the random
+    for(int j = 0; j < nodes; j++) {
+        R[j] = j+123;
+    }
+}
+
+
+void initialiseDatastructures(){
+    if(pherStart==-1){
+        //perform random walk
+        pherStart=0.5;
+    }
+
+    // Compute the size of the data 
+    datasizeParams   = sizeof(Params);
+    datasizeC    = sizeof(double)*nodes*nodes;
+    datasizeP    = sizeof(double)*nodes*nodes;
+    //Need to make a decision at each node so need a random seed at each one of the
+    datasizeR    = sizeof(double)*nodes;
+    datasizeS    = sizeof(int)*(nodes+1)*k;
+    datasizeSC   = sizeof(double)*k;
+
+    // Allocate space for input/output data
+    C   = (double*)malloc(datasizeC);
+    P   = (double*)malloc(datasizeP);
+    R   = (double*)malloc(datasizeR);
+    // S   = (int*)malloc(datasizeS);
+    S   = (int*)calloc ((nodes+1)*k, sizeof(int));
+    SC  = (double*)malloc(datasizeSC);
+
+    // Initialize the input pheromones
+    for(int j = 0; j < nodes; j++) {
+        for(int i = 0; i < nodes; i++) {
+            P[(j*nodes)+i] = pherStart;
+        }
+    }
+
+    initialiseRandom();
+    createGraph();
     size_t source_size =readInKernel(nodes);
+}
+
+void freeMemory(){
+    //-----------------------------------------------------
+    // STEP 13: Release OpenCL resources
+    //----------------------------------------------------- 
+    
+    // Free OpenCL resources
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    clReleaseCommandQueue(cmdQueue);
+    clReleaseMemObject(bufferParam);
+    clReleaseMemObject(bufferC);
+    clReleaseMemObject(bufferP);
+    clReleaseMemObject(bufferR);
+    clReleaseMemObject(bufferS);
+    clReleaseMemObject(bufferSC);
+    clReleaseContext(context);
+
+    // Free host resources
+    free(C);
+    free(P);
+    free(S);
+    free(SC);
+    free(R);
+    free(devices);
 }
 
 int main(int argc, char *argv[]) {
@@ -167,148 +195,18 @@ int main(int argc, char *argv[]) {
     // Use this to check the output of each API call
     cl_int status;  
     status |= platformsAndDevices(status);  
-    
     status |=  createAntBuffers(status);
+    status |=  createProgram(status);
     
-
-
-
-    //-----------------------------------------------------
-    // STEP 7: Create and compile the program
-    //----------------------------------------------------- 
-    cl_program program = clCreateProgramWithSource(
-        context, 
-        1, 
-        (const char**)&programSource,                                 
-        NULL, 
-        &status);
-
-    status = clBuildProgram(
-        program, 
-        numDevices, 
-        devices, 
-        NULL, 
-        NULL, 
-        NULL);
-
-    cl_kernel kernel = NULL;
 
     for (int i = 0; i < maxIter; ++i)
     {
 
-        status = clEnqueueWriteBuffer(
-            cmdQueue, 
-            bufferP, 
-            CL_FALSE, 
-            0, 
-            datasizeP,                                  
-            P, 
-            0, 
-            NULL, 
-            NULL);
-
-       
-        //-----------------------------------------------------
-        // STEP 8: Create the kernel
-        //----------------------------------------------------- 
-
-
-        // Use clCreateKernel() to create a kernel from the 
-        // and walking function (named "stroll")
-        kernel = clCreateKernel(program, "stroll", &status);
-
-        //-----------------------------------------------------
-        // STEP 9: Set the kernel arguments
-        //----------------------------------------------------- 
-        
-        // Associate the input and output buffers with the 
-        // kernel 
-        // using clSetKernelArg()
-        status  = clSetKernelArg(
-            kernel, 
-            0, 
-            sizeof(cl_mem), 
-            &bufferParam);
-        status  = clSetKernelArg(
-            kernel, 
-            1, 
-            sizeof(cl_mem), 
-            &bufferC);
-        status |= clSetKernelArg(
-            kernel, 
-            2, 
-            sizeof(cl_mem), 
-            &bufferP);
-        status |= clSetKernelArg(
-            kernel, 
-            3, 
-            sizeof(cl_mem), 
-            &bufferR);
-        status |= clSetKernelArg(
-            kernel, 
-            4, 
-            sizeof(cl_mem), 
-            &bufferS);
-        status |= clSetKernelArg(
-            kernel, 
-            5, 
-            sizeof(cl_mem), 
-            &bufferSC);
-
-        //-----------------------------------------------------
-        // STEP 10: Configure the work-item structure
-        //-----------------------------------------------------   
-        size_t globalWorkSize[1];    
-        globalWorkSize[0] = k;
-
-        //-----------------------------------------------------
-        // STEP 11: Enqueue the kernel for execution
-        //----------------------------------------------------- 
-        
-        // Execute the kernel by using 
-        // clEnqueueNDRangeKernel().
-        // 'globalWorkSize' is the 1D dimension of the 
-        // work-items
-        status = clEnqueueNDRangeKernel(
-            cmdQueue, 
-            kernel, 
-            1, 
-            NULL, 
-            globalWorkSize, 
-            NULL, 
-            0, 
-            NULL, 
-            NULL);
+        status |= queueAntStroll(status, k);
 
         clFinish(cmdQueue);
-        //-----------------------------------------------------
-        // STEP 12: Read the output buffer back to the host
-        //----------------------------------------------------- 
         
-        // Use clEnqueueReadBuffer() to read the OpenCL output  
-        // buffer (bufferC) 
-        // to the host output array (C)
-        clEnqueueReadBuffer(
-            cmdQueue, 
-            bufferS, 
-            CL_TRUE, 
-            0, 
-            datasizeS, 
-            S, 
-            0, 
-            NULL, 
-            NULL);
-        clEnqueueReadBuffer(
-            cmdQueue, 
-            bufferSC, 
-            CL_TRUE, 
-            0, 
-            datasizeSC, 
-            SC, 
-            0, 
-            NULL, 
-            NULL);
-
+        status |= readOutput(status);
 
         for (int j = 0; j < k; ++j)
         {
@@ -347,28 +245,6 @@ int main(int argc, char *argv[]) {
     }
     
 
-    //-----------------------------------------------------
-    // STEP 13: Release OpenCL resources
-    //----------------------------------------------------- 
-    
-    // Free OpenCL resources
-    clReleaseKernel(kernel);
-    clReleaseProgram(program);
-    clReleaseCommandQueue(cmdQueue);
-    clReleaseMemObject(bufferParam);
-    clReleaseMemObject(bufferC);
-    clReleaseMemObject(bufferP);
-    clReleaseMemObject(bufferR);
-    clReleaseMemObject(bufferS);
-    clReleaseMemObject(bufferSC);
-    clReleaseContext(context);
 
-    // Free host resources
-    free(C);
-    free(P);
-    free(S);
-    free(SC);
-    free(R);
-    free(devices);
 
 }

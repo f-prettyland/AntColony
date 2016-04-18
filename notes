@@ -1,4 +1,5 @@
 construct random graph
+initialise random array
 modularise
 para calc pheremone array
 improve function
@@ -25,6 +26,7 @@ Different parallelisations:
 -------------
 Compare:
 -------------
+	- prove random araray is random
 	- diff attract-cost functions 
 	- probable edge check for zero case and does no maths, see if this speeds up
 	- compiling with constants
@@ -88,6 +90,8 @@ Discuss Phere
 -------------
 Discuss generic:
 -------------
+	appropriately named functions instead
+
 	used |= to represent status so using or thus checking for failure
 
 	Have max 15 digit size due to replace see const

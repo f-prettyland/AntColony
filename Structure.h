@@ -20,6 +20,8 @@ cl_command_queue cmdQueue;
 cl_context context = NULL;
 cl_uint numDevices = 0;
 cl_device_id *devices = NULL;
+cl_program program = NULL;
+cl_kernel kernel = NULL;
 
 cl_mem bufferParam;  // parameters on the device
 cl_mem bufferC;  // cost array on the device
@@ -243,5 +245,122 @@ cl_int createAntBuffers(cl_int status){
         0, 
         NULL, 
         NULL);
+    return status;
+}
+
+cl_int createProgram(cl_int status){
+    //-----------------------------------------------------
+    // STEP 7: Create and compile the program
+    //----------------------------------------------------- 
+    program = clCreateProgramWithSource(
+        context, 
+        1, 
+        (const char**)&programSource,                                 
+        NULL, 
+        &status);
+
+    status |= clBuildProgram(
+        program, 
+        numDevices, 
+        devices, 
+        NULL, 
+        NULL, 
+        NULL);
+
+    return status;
+}
+
+cl_int queueAntStroll(cl_int status, int k){
+    status |= clEnqueueWriteBuffer(cmdQueue, bufferP, CL_FALSE, 0, datasizeP, P, 0, NULL, NULL);
+
+    kernel = clCreateKernel(program, "stroll", &status);
+
+    status  |= clSetKernelArg(
+        kernel, 
+        0, 
+        sizeof(cl_mem), 
+        &bufferParam);
+    status  |= clSetKernelArg(
+        kernel, 
+        1, 
+        sizeof(cl_mem), 
+        &bufferC);
+    status |= clSetKernelArg(
+        kernel, 
+        2, 
+        sizeof(cl_mem), 
+        &bufferP);
+    status |= clSetKernelArg(
+        kernel, 
+        3, 
+        sizeof(cl_mem), 
+        &bufferR);
+    status |= clSetKernelArg(
+        kernel, 
+        4, 
+        sizeof(cl_mem), 
+        &bufferS);
+    status |= clSetKernelArg(
+        kernel, 
+        5, 
+        sizeof(cl_mem), 
+        &bufferSC);
+
+    //-----------------------------------------------------
+    // STEP 10: Configure the work-item structure
+    //-----------------------------------------------------   
+    size_t globalWorkSize[1];    
+    globalWorkSize[0] = k;
+
+    //-----------------------------------------------------
+    // STEP 11: Enqueue the kernel for execution
+    //----------------------------------------------------- 
+    
+    // Execute the kernel by using 
+    // clEnqueueNDRangeKernel().
+    // 'globalWorkSize' is the 1D dimension of the 
+    // work-items
+    status |= clEnqueueNDRangeKernel(
+        cmdQueue, 
+        kernel, 
+        1, 
+        NULL, 
+        globalWorkSize, 
+        NULL, 
+        0, 
+        NULL, 
+        NULL);
+}
+
+
+cl_int readOutput(cl_int status){
+    //-----------------------------------------------------
+    // STEP 12: Read the output buffer back to the host
+    //----------------------------------------------------- 
+    
+    // Use clEnqueueReadBuffer() to read the OpenCL output  
+    // buffer (bufferC) 
+    // to the host output array (C)
+    status |= clEnqueueReadBuffer(
+        cmdQueue, 
+        bufferS, 
+        CL_TRUE, 
+        0, 
+        datasizeS, 
+        S, 
+        0, 
+        NULL, 
+        NULL);
+    status |= clEnqueueReadBuffer(
+        cmdQueue, 
+        bufferSC, 
+        CL_TRUE, 
+        0, 
+        datasizeSC, 
+        SC, 
+        0, 
+        NULL, 
+        NULL);
+    
     return status;
 }
