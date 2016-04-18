@@ -1,12 +1,12 @@
-construct random graph
-initialise random array
-modularise
+init phere
+
 para calc pheremone array
 improve function
 ACS
 para calc prob array
 
 Not running right? Do you:
+	DO YOU CALL THE FUNCTION?
 	have __ flags
 	reference correct global id
 	reference correct kernel

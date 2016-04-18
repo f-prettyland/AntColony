@@ -40,9 +40,24 @@ uint32_t pcg32_boundedrand_r(pcg32_random_t* rng, uint32_t bound)
 int main(int argc, char** argv)
 {
 	pcg32_random_t rng;
-	int rounds = 1;
-	pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf,(intptr_t)&rounds);
-	double rand= (pcg32_boundedrand_r(&rng,5)/5.0f);
-	printf("num: %f", rand);
-	
+
+    int size =atoi(argv[1]);
+    int rounds = size*size;
+    pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf,(intptr_t)&rounds);
+    for (int j = 0; j < size; ++j)
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            double ans=  (double)((pcg32_boundedrand_r(&rng,10))+1);
+            printf("num: %f\n", ans);
+        }
+        printf("new rund\n");
+    }
+
+	// pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf,(intptr_t)&rounds);
+ //    for (int i = 0; i < rounds; ++i)
+ //    {
+ //        double rand= (pcg32_boundedrand_r(&rng,234)+2);
+ //        printf("num: %f\n", rand);
+ //    }
 }

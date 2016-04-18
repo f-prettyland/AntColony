@@ -9,9 +9,10 @@ int k;
 double evap;
 int maxIter;
 int nodes;
-double maxCost;
-double minCost;
+int maxCost;
+int minCost;
 double pherStart;
+int randBound = 1000;
 
 void handleArguments(int argc, char *argv[]){
     if(argc<8){
@@ -27,6 +28,7 @@ void handleArguments(int argc, char *argv[]){
         puts("\n---Optional");
         puts("-iP initial pheremone [if left blank will perform random walk to guess value]");
         puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
+        printf("-rB random bound limit [if left blank will take harcoded limit: %d]\n", randBound);
         exit(0);
     }
 
@@ -36,8 +38,8 @@ void handleArguments(int argc, char *argv[]){
     params.Beta = atof(argv[4]);
     maxIter = atoi(argv[5]);
     nodes = atoi(argv[6]);
-    maxCost = atof(argv[7]);
-    minCost = atof(argv[8]);
+    minCost = atoi(argv[7]);
+    maxCost = atoi(argv[8]);
     if(minCost<=0){
         puts("Minimum cost must be more than 0, assuming to be 1 instead");
         minCost=1.0;
@@ -57,6 +59,9 @@ void handleArguments(int argc, char *argv[]){
             }
             if((p = strstr(argv[i], "sN"))){
                 params.StartNode = atoi(argv[i+1]);
+            }
+            if((p = strstr(argv[i], "-rB"))){
+                randBound = atoi(argv[i+1]);
             }
         }
     }
@@ -86,45 +91,14 @@ void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nod
 
 void createGraph(){
     // todo, calloc this?
+    printf("min %d\n", minCost);
+    printf("max %d\n", maxCost);
+    getLmtRands2D(C, nodes, maxCost, minCost);
+
     for(int j = 0; j < nodes; j++) {
-        for(int i = 0; i < nodes; i++) {
-            C[(j*nodes)+i] = 0;
-        }
-    }
-
-    C[(0*nodes)+1]=2.0;
-    C[(0*nodes)+2]=3;
-    C[(0*nodes)+3]=3;
-    C[(0*nodes)+4]=4;
-
-    C[(1*nodes)+0]=2;
-    C[(1*nodes)+2]=2;
-    C[(1*nodes)+3]=9;
-    C[(1*nodes)+4]=8;
-
-    C[(2*nodes)+0]=3;
-    C[(2*nodes)+1]=2;
-    C[(2*nodes)+3]=10;
-    C[(2*nodes)+4]=9;
-
-    C[(3*nodes)+0]=3;
-    C[(3*nodes)+1]=9;
-    C[(3*nodes)+2]=10;
-    C[(3*nodes)+4]=6;
-
-    C[(4*nodes)+0]=4;
-    C[(4*nodes)+1]=8;
-    C[(4*nodes)+2]=9;
-    C[(4*nodes)+3]=6;
-}
-
-void initialiseRandom(){
-    // Initialize the random
-    for(int j = 0; j < nodes; j++) {
-        R[j] = j+123;
+            C[(j*nodes)+j] = 0;
     }
 }
-
 
 void initialiseDatastructures(){
     if(pherStart==-1){
@@ -156,7 +130,7 @@ void initialiseDatastructures(){
         }
     }
 
-    initialiseRandom();
+    getRandsDoub(R, nodes, randBound);
     createGraph();
     size_t source_size =readInKernel(nodes);
 }
@@ -188,15 +162,26 @@ void freeMemory(){
 }
 
 int main(int argc, char *argv[]) {
-
     handleArguments(argc, argv);
     initialiseDatastructures();
     
     // Use this to check the output of each API call
     cl_int status;  
     status |= platformsAndDevices(status);  
+    if(status < 0){
+        fprintf(stderr, "%s %d\n", "Error in platform identification error code: ", status);
+        exit(0);
+    }
     status |=  createAntBuffers(status);
+    if(status < 0){
+        fprintf(stderr, "%s %d\n", "Error in buffer generation with error code: ", status);
+        exit(0);
+    }
     status |=  createProgram(status);
+    if(status < 0){
+        fprintf(stderr, "%s %d\n", "Error in compilation with error code: ", status);
+        exit(0);
+    }
     
 
     for (int i = 0; i < maxIter; ++i)

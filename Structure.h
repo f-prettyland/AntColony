@@ -45,7 +45,6 @@ size_t datasizeR;
 size_t datasizeS;
 size_t datasizeSC;
 
-
 size_t readInKernel(int nodes){
     FILE *fp;
     size_t source_size;
@@ -332,7 +331,6 @@ cl_int queueAntStroll(cl_int status, int k){
         NULL);
 }
 
-
 cl_int readOutput(cl_int status){
     //-----------------------------------------------------
     // STEP 12: Read the output buffer back to the host
@@ -361,6 +359,6 @@ cl_int readOutput(cl_int status){
         0, 
         NULL, 
         NULL);
-    
+
     return status;
 }

@@ -1,10 +1,10 @@
 
 all: vecadd
 
-ants: ants.c
+ants: ants.c BorrowedFunc.h Structure.h
 	gcc -std=c99 ants.c -lOpenCL -o ants
 
-antsg: ants.c
+antsg: ants.c BorrowedFunc.h Structure.h
 	gcc -std=c99 ants.c -lOpenCL -o ants -g
 
 vecadd: vecadd.c
