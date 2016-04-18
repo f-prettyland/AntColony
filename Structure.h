@@ -120,8 +120,6 @@ cl_int platformsAndDevices(cl_int status){
         (cl_device_id*)malloc(
             numDevices*sizeof(cl_device_id));
 
-    printf("NUM %d\n", numDevices);
-
     // Fill in devices with clGetDeviceIDs()
     status |= clGetDeviceIDs(
         platforms[platformToUse], 

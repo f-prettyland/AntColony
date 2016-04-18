@@ -38,14 +38,6 @@ __kernel void stroll(
             __global int *S,
             __global double *SC
             )
-// void stroll(
-            // int idx,
-//             struct Params *param,
-//             double *C,
-//             double *P,
-//             double *R,
-//             int *S,
-//             double *SC)
 {
    int idx = get_global_id(0);
 
@@ -64,7 +56,7 @@ __kernel void stroll(
     int solnLength = 0;
     double solnCost = 0;
 
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < NODESIZE; ++i)
     {
         visited[i]=false;
     }
@@ -73,7 +65,7 @@ __kernel void stroll(
     solution[solnLength] = startNode;
     visited[startNode] = true;
 
-
+    bool dan = false;
     do{
     	//if it has gone to all the nodes, but is not at the beginning
     	if(solnLength==(nodes-1)){
@@ -88,9 +80,7 @@ __kernel void stroll(
     		//can be -1 as path to self should be 0 (not allowed)
 
     		//as not all nodes are in edge attraction need to map from place to place
-    		// int edgeAttrMap[nodes-1];
-    		// int numPossPaths = 0;
-
+            int possiblePaths =0;
     		double sumPossEdgeAttract = 0;
 
     		for (int i = 0; i < nodes; ++i)
@@ -102,6 +92,7 @@ __kernel void stroll(
                     edgeAttraction[i] = pow(attractFromCost(possibleEdgeCost),alpha)*pow((P[((solution[solnLength])*nodes)+i]),beta);
     				//add to sum for nomarlisation later
     				sumPossEdgeAttract += edgeAttraction[i];
+                    possiblePaths++;
     			}else{
     				// already seen or zero cost
     				edgeAttraction[i] = 0;
@@ -111,7 +102,6 @@ __kernel void stroll(
     		double freeWill = getRandom(R[solnLength], idx);
     		int chosenPath = getProbableEdgeRandomly(freeWill, edgeAttraction, nodes, sumPossEdgeAttract);
             solnCost +=  C[((solution[solnLength])*nodes)+chosenPath];
-
     		visited[chosenPath] = true;
     		
     		solnLength++;

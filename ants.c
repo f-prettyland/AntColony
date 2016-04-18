@@ -12,7 +12,8 @@ int nodes;
 int maxCost;
 int minCost;
 double pherStart;
-int randBound = 1000;
+int randBound = 10;
+int verbosity = 1;
 
 void handleArguments(int argc, char *argv[]){
     if(argc<8){
@@ -29,6 +30,7 @@ void handleArguments(int argc, char *argv[]){
         puts("-iP initial pheremone [if left blank will perform random walk to guess value]");
         puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
         printf("-rB random bound limit [if left blank will take harcoded limit: %d]\n", randBound);
+        printf("-vB verbosity, 0 is only final output, 1 is intermediate solutions, 2 is intermediate all values [if left blank will take harcoded limit: %d]\n", verbosity);
         exit(0);
     }
 
@@ -63,6 +65,10 @@ void handleArguments(int argc, char *argv[]){
             if((p = strstr(argv[i], "-rB"))){
                 randBound = atoi(argv[i+1]);
             }
+
+            if((p = strstr(argv[i], "-vB"))){
+                verbosity = atoi(argv[i+1]);
+            }
         }
     }
 }
@@ -90,11 +96,10 @@ void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nod
 }
 
 void createGraph(){
-    // todo, calloc this?
-    printf("min %d\n", minCost);
-    printf("max %d\n", maxCost);
+    //make random
     getLmtRands2D(C, nodes, maxCost, minCost);
 
+    //make sure cannot go to self
     for(int j = 0; j < nodes; j++) {
             C[(j*nodes)+j] = 0;
     }
@@ -161,6 +166,18 @@ void freeMemory(){
     free(devices);
 }
 
+
+int bestSoln(){
+    int best =0;
+    for (int i = 0; i < k; ++i)
+    {
+        if(SC[best]>SC[i]){
+            best =i;
+        }
+    }
+    return best;
+}
+
 int main(int argc, char *argv[]) {
     handleArguments(argc, argv);
     initialiseDatastructures();
@@ -183,40 +200,9 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     
-
-    for (int i = 0; i < maxIter; ++i)
-    {
-
-        status |= queueAntStroll(status, k);
-
-        clFinish(cmdQueue);
-        
-        status |= readOutput(status);
-
-        for (int j = 0; j < k; ++j)
-        {
-            printf("Output %d is dun %d, score: %f\n",i, j, SC[j]);
-            for (int p = 0; p < nodes+1; ++p)
-            {
-                printf("%d\n", S[(j*(nodes+1))+p]);
-            }
-            printf("\n");
-        }
-
-        printf("%s\n", "PHEREBEFORE----------------------");
-        for (int j = 0; j < nodes; ++j)
-        {
-            for (int p = 0; p < nodes; ++p)
-            {
-                printf("%f ", P[(j*(nodes))+p]);
-            }
-            printf("\n");
-        }
-
-        updatePheremones(S, P, evap, SC, k, nodes);
-
-
-        printf("%s\n", "PHEREAFTER-----------------------");
+    if(verbosity>=2){
+        printf("%s\n", "INIT PHEREMONE");
+        printf("%s\n", "---------");
         for (int j = 0; j < nodes; ++j)
         {
             for (int p = 0; p < nodes; ++p)
@@ -228,8 +214,61 @@ int main(int argc, char *argv[]) {
         printf("\n");
         printf("\n");
     }
+
+    for (int i = 0; i < maxIter; ++i)
+    {
+
+        status |= queueAntStroll(status, k);
+
+        clFinish(cmdQueue);
+        
+        status |= readOutput(status);
+
+        if(verbosity>=1){
+            printf("\n");
+            printf("\n");
+            printf("------------------\n");
+            printf("Iteration %d\n", i);
+            printf("------------------\n");
+            for (int j = 0; j < k; ++j)
+            {
+                printf("Output %d is dun %d, score: %f\n",i, j, SC[j]);
+                for (int p = 0; p < nodes+1; ++p)
+                {
+                    printf("%d ", S[(j*(nodes+1))+p]);
+                }
+                printf("\n");
+            }
+        }
+
+        updatePheremones(S, P, evap, SC, k, nodes);
+
+        if(verbosity>=2){
+            printf("%s\n", "PHEREMONE");
+            printf("%s\n", "---------");
+            for (int j = 0; j < nodes; ++j)
+            {
+                for (int p = 0; p < nodes; ++p)
+                {
+                    printf("%f ", P[(j*(nodes))+p]);
+                }
+                printf("\n");
+            }
+            printf("\n");
+            printf("\n");
+        }
+    }
     
+    printf("\n");
+    printf("\n");
+    printf("------------------------------------\n");
+    printf("After %d iterations best solution is: \n", maxIter);
+    int bs = bestSoln();
+    for (int p = 0; p < nodes+1; ++p)
+    {
+        printf("%d ", S[(bs*(nodes+1))+p]);
+    }
+    printf("\nWith a total travel cost of %f\n", SC[bs]);
 
-
-
+    freeMemory();
 }
