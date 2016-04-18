@@ -47,18 +47,20 @@ __kernel void stroll(
 //             int *S,
 //             double *SC)
 {
-
-    int idx = get_global_id(0);
+   int idx = get_global_id(0);
 
     __private int solution[NODESIZEPLUS1];
     __private bool visited[NODESIZE];
     __private double edgeAttraction[NODESIZE];
 
     int nodes = param->Nodes;
+    int startNode = param->StartNode;
     double alpha = param->Alpha;
     double beta = param->Beta;
-    int startNode = param->StartNode;
-    
+    if(startNode == -1){
+        startNode = get_global_id(0) % nodes;
+    }
+
     int solnLength = 0;
     double solnCost = 0;
 

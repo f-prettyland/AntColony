@@ -1,4 +1,4 @@
-Have max 15 digit size due to replace
+
 
 Not running right? Do you:
 	have __ flags
@@ -83,6 +83,8 @@ Discuss Phere
 -------------
 Discuss generic:
 -------------
+	Have max 15 digit size due to replace see const
+
 	This is an undirected graph, it _should_ have triangular array.
 		Requires much more searching? NO, just more accessing?
 

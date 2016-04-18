@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include "BorrowedFunc.h"
 
 #include <CL/cl.h>
@@ -19,6 +20,10 @@ typedef struct Params
     double Alpha;
     double Beta;
 } Params;
+
+size_t datasizeC;
+char * programSource;
+int nodes;
 
 void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nodes) {
     //evaporate
@@ -42,9 +47,90 @@ void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nod
     }
 }
 
-int main() {
-    // This code executes on the OpenCL host
-    const int k = 5;
+size_t readInKernel(){
+    FILE *fp;
+    size_t source_size;
+
+    /* Load kernel source file */
+    fp = fopen(fileName, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed to load kernel.\n");    
+        exit(1);
+    }   
+    programSource = (char *)malloc(MAX_SOURCE_SIZE);
+    source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
+
+    char strNodes[MAX_NODES_DIGITS];
+    sprintf(strNodes, "%d", (nodes+1));
+    char *replaceOut;
+    replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
+    while(replaceOut != NULL){
+        programSource = replaceOut;
+        replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
+    }
+    sprintf(strNodes, "%d", nodes);
+    replaceOut = replace_str(programSource, nodeReplace, strNodes);
+    while(replaceOut != NULL){
+        programSource = replaceOut;
+        replaceOut = replace_str(programSource, nodeReplace, strNodes);
+    }
+    fclose(fp);
+    return source_size;
+}
+
+int main(int argc, char *argv[]) {
+    if(argc<8){
+        puts("---This program takes 7 arguments and 2 optional arguments:");
+        puts("number of ants per iteration");
+        puts("evaporation constant");
+        puts("alpha");
+        puts("beta");
+        puts("max number of iterations");
+        puts("number of nodes");
+        puts("maximum cost of an edge");
+        puts("minimum cost of an edge");
+        puts("\n---Optional");
+        puts("-iP initial pheremone [if left blank will perform random walk to guess value]");
+        puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
+        exit(0);
+    }
+    Params params;
+
+    int k = atoi(argv[1]);
+    double evap = atof(argv[2]);
+    params.Alpha = atof(argv[3]);
+    params.Beta = atof(argv[4]);
+    int maxIter = atoi(argv[5]);
+    nodes = atoi(argv[6]);
+    double maxCost = atof(argv[7]);
+    double minCost = atof(argv[8]);
+    if(minCost<=0){
+        puts("Minimum cost must be more than 0, assuming to be 1 instead");
+        minCost=1.0;
+    }
+
+    params.Nodes = nodes;
+
+    // never negative as otherwise would break alpha and beta
+    double pherStart = -1;
+    params.StartNode = -1;
+
+
+    if(argc >=9){
+        char *p;
+        for (int i = 9; i < (argc-1); ++i)
+        {
+            if((p = strstr(argv[i], "-iP"))){
+                pherStart = atof(argv[i+1]);
+            }
+            if((p = strstr(argv[i], "sN"))){
+                params.StartNode = atoi(argv[i+1]);
+            }
+        }
+    }
+    if(pherStart==-1){
+        //perform random walk
+    }
 
     // Host data
     double *C   = NULL;  // Cost array
@@ -53,29 +139,10 @@ int main() {
     int *S      = NULL;     // Path taken
     double *SC  = NULL;// cost of solution
 
-    //TODO somehow track number of ants outputting this soln?
-    //      This can be calc'd afterwards
-
-    // Nodes to represent in each array
-    const int nodes = 5;
-    // Constant to start pheromone on
-    const double pherStart = 0.2;
-
-    const double evap = 0.5;
-
-    Params params;
-    params.Nodes = nodes;
-
-    params.StartNode = 0;
-    //cost weighting
-    params.Alpha = 1;
-    //pheromone weighting
-    params.Beta = 1;
-    
     // Compute the size of the data 
     size_t datasizeParams   = sizeof(Params);
 
-    size_t datasizeC    = sizeof(double)*nodes*nodes;
+    datasizeC    = sizeof(double)*nodes*nodes;
     size_t datasizeP    = sizeof(double)*nodes*nodes;
     //Need to make a decision at each node so need a random seed at each one of the
     size_t datasizeR    = sizeof(double)*nodes;
@@ -134,34 +201,9 @@ int main() {
     C[(4*nodes)+2]=9;
     C[(4*nodes)+3]=6;
 
+    
     FILE *fp;
-    size_t source_size;
-    char *programSource;
-
-    /* Load kernel source file */
-    fp = fopen(fileName, "r");
-    if (!fp) {
-        fprintf(stderr, "Failed to load kernel.\n");    
-        exit(1);
-    }   
-    programSource = (char *)malloc(MAX_SOURCE_SIZE);
-    source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
-
-    char strNodes[MAX_NODES_DIGITS];
-    sprintf(strNodes, "%d", (nodes+1));
-    char *replaceOut;
-    replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
-    while(replaceOut != NULL){
-        programSource = replaceOut;
-        replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
-    }
-    sprintf(strNodes, "%d", nodes);
-    replaceOut = replace_str(programSource, nodeReplace, strNodes);
-    while(replaceOut != NULL){
-        programSource = replaceOut;
-        replaceOut = replace_str(programSource, nodeReplace, strNodes);
-    }
-    fclose(fp);
+    size_t source_size =readInKernel();
 
     // Use this to check the output of each API call
     cl_int status;  
@@ -363,8 +405,8 @@ int main() {
         NULL);
 
     cl_kernel kernel = NULL;
-    
-    for (int i = 0; i < 4; ++i)
+
+    for (int i = 0; i < maxIter; ++i)
     {
 
         status = clEnqueueWriteBuffer(
