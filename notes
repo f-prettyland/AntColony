@@ -26,7 +26,7 @@ Different parallelisations:
 -------------
 Compare:
 -------------
-	- prove random araray is random
+	- prove random araray is random (enough)
 	- diff attract-cost functions 
 	- probable edge check for zero case and does no maths, see if this speeds up
 	- compiling with constants
