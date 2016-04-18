@@ -3,27 +3,68 @@
 #include <stdbool.h>
 #include <string.h>
 #include "BorrowedFunc.h"
+#include "Structure.h"
 
-#include <CL/cl.h>
 
-#define MAX_SOURCE_SIZE (0x100000)
-#define MAX_NODES_DIGITS (15)
 
-const char fileName[] = "./antKernel.cl";
-const char nodeReplace[] = "NODESIZE";
-const char nodePlusReplace[] = "NODESIZEPLUS1";
-
-typedef struct Params
-{
-    int Nodes;
-    int StartNode;
-    double Alpha;
-    double Beta;
-} Params;
-
-size_t datasizeC;
-char * programSource;
+int k;
+double evap;
+int maxIter;
 int nodes;
+double maxCost;
+double minCost;
+double pherStart;
+
+void handleArguments(int argc, char *argv[]){
+    if(argc<8){
+        puts("---This program takes 7 arguments and 2 optional arguments:");
+        puts("number of ants per iteration");
+        puts("evaporation constant");
+        puts("alpha");
+        puts("beta");
+        puts("max number of iterations");
+        puts("number of nodes");
+        puts("maximum cost of an edge");
+        puts("minimum cost of an edge");
+        puts("\n---Optional");
+        puts("-iP initial pheremone [if left blank will perform random walk to guess value]");
+        puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
+        exit(0);
+    }
+
+    k = atoi(argv[1]);
+    evap = atof(argv[2]);
+    params.Alpha = atof(argv[3]);
+    params.Beta = atof(argv[4]);
+    maxIter = atoi(argv[5]);
+    nodes = atoi(argv[6]);
+    maxCost = atof(argv[7]);
+    minCost = atof(argv[8]);
+    if(minCost<=0){
+        puts("Minimum cost must be more than 0, assuming to be 1 instead");
+        minCost=1.0;
+    }
+    params.Nodes = nodes;
+
+    // never negative as otherwise would break alpha and beta
+    pherStart = -1;
+    params.StartNode = -1;
+
+    if(argc >=9){
+        char *p;
+        for (int i = 9; i < (argc-1); ++i)
+        {
+            if((p = strstr(argv[i], "-iP"))){
+                pherStart = atof(argv[i+1]);
+            }
+            if((p = strstr(argv[i], "sN"))){
+                params.StartNode = atoi(argv[i+1]);
+            }
+        }
+    }
+}
+
+
 
 void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nodes) {
     //evaporate
@@ -47,107 +88,20 @@ void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nod
     }
 }
 
-size_t readInKernel(){
-    FILE *fp;
-    size_t source_size;
-
-    /* Load kernel source file */
-    fp = fopen(fileName, "r");
-    if (!fp) {
-        fprintf(stderr, "Failed to load kernel.\n");    
-        exit(1);
-    }   
-    programSource = (char *)malloc(MAX_SOURCE_SIZE);
-    source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
-
-    char strNodes[MAX_NODES_DIGITS];
-    sprintf(strNodes, "%d", (nodes+1));
-    char *replaceOut;
-    replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
-    while(replaceOut != NULL){
-        programSource = replaceOut;
-        replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
-    }
-    sprintf(strNodes, "%d", nodes);
-    replaceOut = replace_str(programSource, nodeReplace, strNodes);
-    while(replaceOut != NULL){
-        programSource = replaceOut;
-        replaceOut = replace_str(programSource, nodeReplace, strNodes);
-    }
-    fclose(fp);
-    return source_size;
-}
-
-int main(int argc, char *argv[]) {
-    if(argc<8){
-        puts("---This program takes 7 arguments and 2 optional arguments:");
-        puts("number of ants per iteration");
-        puts("evaporation constant");
-        puts("alpha");
-        puts("beta");
-        puts("max number of iterations");
-        puts("number of nodes");
-        puts("maximum cost of an edge");
-        puts("minimum cost of an edge");
-        puts("\n---Optional");
-        puts("-iP initial pheremone [if left blank will perform random walk to guess value]");
-        puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
-        exit(0);
-    }
-    Params params;
-
-    int k = atoi(argv[1]);
-    double evap = atof(argv[2]);
-    params.Alpha = atof(argv[3]);
-    params.Beta = atof(argv[4]);
-    int maxIter = atoi(argv[5]);
-    nodes = atoi(argv[6]);
-    double maxCost = atof(argv[7]);
-    double minCost = atof(argv[8]);
-    if(minCost<=0){
-        puts("Minimum cost must be more than 0, assuming to be 1 instead");
-        minCost=1.0;
-    }
-
-    params.Nodes = nodes;
-
-    // never negative as otherwise would break alpha and beta
-    double pherStart = -1;
-    params.StartNode = -1;
-
-
-    if(argc >=9){
-        char *p;
-        for (int i = 9; i < (argc-1); ++i)
-        {
-            if((p = strstr(argv[i], "-iP"))){
-                pherStart = atof(argv[i+1]);
-            }
-            if((p = strstr(argv[i], "sN"))){
-                params.StartNode = atoi(argv[i+1]);
-            }
-        }
-    }
+void initialiseDatastructures(){
     if(pherStart==-1){
         //perform random walk
+        pherStart=0.5;
     }
 
-    // Host data
-    double *C   = NULL;  // Cost array
-    double *P   = NULL;  // Pheromone array
-    double *R   = NULL;     // Ants randomness
-    int *S      = NULL;     // Path taken
-    double *SC  = NULL;// cost of solution
-
     // Compute the size of the data 
-    size_t datasizeParams   = sizeof(Params);
-
+    datasizeParams   = sizeof(Params);
     datasizeC    = sizeof(double)*nodes*nodes;
-    size_t datasizeP    = sizeof(double)*nodes*nodes;
+    datasizeP    = sizeof(double)*nodes*nodes;
     //Need to make a decision at each node so need a random seed at each one of the
-    size_t datasizeR    = sizeof(double)*nodes;
-    size_t datasizeS    = sizeof(int)*(nodes+1)*k;
-    size_t datasizeSC   = sizeof(double)*k;
+    datasizeR    = sizeof(double)*nodes;
+    datasizeS    = sizeof(int)*(nodes+1)*k;
+    datasizeSC   = sizeof(double)*k;
 
     // Allocate space for input/output data
     C   = (double*)malloc(datasizeC);
@@ -202,189 +156,22 @@ int main(int argc, char *argv[]) {
     C[(4*nodes)+3]=6;
 
     
-    FILE *fp;
-    size_t source_size =readInKernel();
+    size_t source_size =readInKernel(nodes);
+}
 
+int main(int argc, char *argv[]) {
+
+    handleArguments(argc, argv);
+    initialiseDatastructures();
+    
     // Use this to check the output of each API call
     cl_int status;  
-     
-    //-----------------------------------------------------
-    // STEP 1: Discover and initialize the platforms
-    //-----------------------------------------------------
+    status |= platformsAndDevices(status);  
     
-    cl_uint numPlatforms = 0;
-    cl_platform_id *platforms = NULL;
+    status |=  createAntBuffers(status);
     
-    // Use clGetPlatformIDs() to retrieve the number of 
-    // platforms
-    status = clGetPlatformIDs(0, NULL, &numPlatforms);
- 
-    // Allocate enough space for each platform
-    platforms =   
-        (cl_platform_id*)malloc(
-            numPlatforms*sizeof(cl_platform_id));
- 
-    // Fill in platforms with clGetPlatformIDs()
-    status = clGetPlatformIDs(numPlatforms, platforms, 
-                NULL);
-
-    //-----------------------------------------------------
-    // STEP 2: Discover and initialize the devices
-    //----------------------------------------------------- 
-    
-    cl_uint numDevices = 0;
-    cl_device_id *devices = NULL;
-    int platformToUse = 0;
-    // int platformToUse = 1;
-    cl_device_type dType = CL_DEVICE_TYPE_ALL;
-    // cl_device_type dType = CL_DEVICE_TYPE_GPU;
-
-    // Use clGetDeviceIDs() to retrieve the number of 
-    // devices present
-    status = clGetDeviceIDs(
-        platforms[0], 
-        dType, 
-        0, 
-        NULL, 
-        &numDevices);
-
-    // Allocate enough space for each device
-    devices = 
-        (cl_device_id*)malloc(
-            numDevices*sizeof(cl_device_id));
-
-    printf("NUM %d\n", numDevices);
-
-    // Fill in devices with clGetDeviceIDs()
-    status = clGetDeviceIDs(
-        platforms[platformToUse], 
-        dType,        
-        numDevices, 
-        devices, 
-        NULL);
-    //-----------------------------------------------------
-    // STEP 3: Create a context
-    //----------------------------------------------------- 
-    
-    cl_context context = NULL;
-
-    // Create a context using clCreateContext() and 
-    // associate it with the devices
-    context = clCreateContext(
-        NULL, 
-        numDevices, 
-        devices, 
-        NULL, 
-        NULL, 
-        &status);
-
-    //-----------------------------------------------------
-    // STEP 4: Create a command queue
-    //----------------------------------------------------- 
-    
-    cl_command_queue cmdQueue;
-
-    // Create a command queue using clCreateCommandQueue(),
-    // and associate it with the device you want to execute 
-    // on
-    cmdQueue = clCreateCommandQueue(
-        context, 
-        devices[0], 
-        0, 
-        &status);
-
-    //-----------------------------------------------------
-    // STEP 5: Create device buffers
-    //----------------------------------------------------- 
-    
-    cl_mem bufferParam;  // cost array on the device
-    cl_mem bufferC;  // cost array on the device
-    cl_mem bufferP;  // Pheromone array on the device
-    cl_mem bufferR;  // Input array on the device
-    cl_mem bufferS;  // Output path from the device
-    cl_mem bufferSC;  // Output cost from the device
-
-    // if doing CL_MEM_READ_WRITE
-
-    bufferParam = clCreateBuffer(
-        context,
-        CL_MEM_READ_ONLY,
-        sizeof(Params),
-        NULL,
-        &status);
-
-    bufferC = clCreateBuffer(
-        context, 
-        CL_MEM_READ_ONLY,                         
-        datasizeC, 
-        NULL, 
-        &status);
-
-    bufferP = clCreateBuffer(
-        context, 
-        CL_MEM_READ_ONLY,                         
-        datasizeP, 
-        NULL, 
-        &status);
-
-    bufferR = clCreateBuffer(
-        context, 
-        CL_MEM_READ_ONLY,                         
-        datasizeR, 
-        NULL, 
-        &status);
-
-    bufferS = clCreateBuffer(
-        context, 
-        CL_MEM_WRITE_ONLY,                 
-        datasizeS, 
-        NULL, 
-        &status);
-
-    bufferSC = clCreateBuffer(
-        context, 
-        CL_MEM_WRITE_ONLY,                 
-        datasizeSC, 
-        NULL, 
-        &status);
-
-    //-----------------------------------------------------
-    // STEP 6: Write host data to device buffers
-    //----------------------------------------------------- 
-
-    status = clEnqueueWriteBuffer(
-        cmdQueue, 
-        bufferC, 
-        CL_FALSE, 
-        0, 
-        datasizeC,                         
-        C, 
-        0, 
-        NULL, 
-        NULL);
 
 
-    status = clEnqueueWriteBuffer(
-        cmdQueue, 
-        bufferR, 
-        CL_FALSE, 
-        0, 
-        datasizeR,                                  
-        R, 
-        0, 
-        NULL, 
-        NULL);
-
-    status = clEnqueueWriteBuffer(
-        cmdQueue, 
-        bufferParam, 
-        CL_TRUE, 
-        0, 
-        datasizeParams,                                  
-        &params, 
-        0, 
-        NULL, 
-        NULL);
 
     //-----------------------------------------------------
     // STEP 7: Create and compile the program
@@ -582,6 +369,6 @@ int main(int argc, char *argv[]) {
     free(S);
     free(SC);
     free(R);
-    free(platforms);
     free(devices);
+
 }

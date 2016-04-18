@@ -1,4 +1,9 @@
-
+construct random graph
+modularise
+para calc pheremone array
+improve function
+ACS
+para calc prob array
 
 Not running right? Do you:
 	have __ flags
@@ -83,6 +88,8 @@ Discuss Phere
 -------------
 Discuss generic:
 -------------
+	used |= to represent status so using or thus checking for failure
+
 	Have max 15 digit size due to replace see const
 
 	This is an undirected graph, it _should_ have triangular array.
