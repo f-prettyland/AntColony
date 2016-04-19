@@ -2,11 +2,13 @@
 #define MAX_SOURCE_SIZE (0x100000)
 #define MAX_NODES_DIGITS (15)
 
-const char fileName[] = "./antKernel.cl";
+const char antFileName[] = "./antKernel.cl";
 const char nodeReplace[] = "NODESIZE";
 const char nodePlusReplace[] = "NODESIZEPLUS1";
+char * antProgramSource;
 
-char * programSource;
+const char pherFileName[] = "./pheremoneKernel.cl";
+char * pherProgramSource;
 
 typedef struct Params
 {
@@ -23,7 +25,9 @@ cl_context context = NULL;
 cl_uint numDevices = 0;
 cl_device_id *devices = NULL;
 cl_program program = NULL;
+cl_program pherProgram = NULL;
 cl_kernel kernel = NULL;
+
 
 cl_mem bufferParam;  // parameters on the device
 cl_mem bufferC;  // cost array on the device
@@ -31,6 +35,11 @@ cl_mem bufferP;  // Pheromone array on the device
 cl_mem bufferR;  // Input array on the device
 cl_mem bufferS;  // Output path from the device
 cl_mem bufferSC;  // Output cost from the device
+
+cl_mem pbufferParam;  // parameters on the device
+cl_mem pbufferP;  // Pheromone array on the device
+cl_mem pbufferS;  // Output path from the device
+cl_mem pbufferSC;  // Output cost from the device
 
 // Host data
 Params params;
@@ -47,7 +56,7 @@ size_t datasizeR;
 size_t datasizeS;
 size_t datasizeSC;
 
-size_t readInKernel(int nodes){
+size_t readInKernel(int nodes, char * programSource, const char * fileName, bool isAnt){
     FILE *fp;
     size_t source_size;
 
@@ -57,23 +66,26 @@ size_t readInKernel(int nodes){
         fprintf(stderr, "Failed to load kernel.\n");    
         exit(1);
     }   
-    programSource = (char *)malloc(MAX_SOURCE_SIZE);
-    source_size = fread(programSource, 1, MAX_SOURCE_SIZE, fp);
+    antProgramSource = (char *)malloc(MAX_SOURCE_SIZE);
+    source_size = fread(antProgramSource, 1, MAX_SOURCE_SIZE, fp);
 
-    char strNodes[MAX_NODES_DIGITS];
-    sprintf(strNodes, "%d", (nodes+1));
-    char *replaceOut;
-    replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
-    while(replaceOut != NULL){
-        programSource = replaceOut;
-        replaceOut = replace_str(programSource, nodePlusReplace, strNodes);
+    if(isAnt){
+        char strNodes[MAX_NODES_DIGITS];
+        sprintf(strNodes, "%d", (nodes+1));
+        char *replaceOut;
+        replaceOut = replace_str(antProgramSource, nodePlusReplace, strNodes);
+        while(replaceOut != NULL){
+            antProgramSource = replaceOut;
+            replaceOut = replace_str(antProgramSource, nodePlusReplace, strNodes);
+        }
+        sprintf(strNodes, "%d", nodes);
+        replaceOut = replace_str(antProgramSource, nodeReplace, strNodes);
+        while(replaceOut != NULL){
+            antProgramSource = replaceOut;
+            replaceOut = replace_str(antProgramSource, nodeReplace, strNodes);
+        }
     }
-    sprintf(strNodes, "%d", nodes);
-    replaceOut = replace_str(programSource, nodeReplace, strNodes);
-    while(replaceOut != NULL){
-        programSource = replaceOut;
-        replaceOut = replace_str(programSource, nodeReplace, strNodes);
-    }
+
     fclose(fp);
     return source_size;
 }
@@ -254,7 +266,7 @@ cl_int createAntProgram(cl_int status){
     program = clCreateProgramWithSource(
         context, 
         1, 
-        (const char**)&programSource,                                 
+        (const char**)&antProgramSource,                                 
         NULL, 
         &status);
 
@@ -331,7 +343,7 @@ cl_int queueAntStroll(cl_int status, int k){
         NULL);
 }
 
-cl_int readOutput(cl_int status){
+cl_int readAntOutput(cl_int status){
     //-----------------------------------------------------
     // STEP 12: Read the output buffer back to the host
     //----------------------------------------------------- 
@@ -356,6 +368,174 @@ cl_int readOutput(cl_int status){
         0, 
         datasizeSC, 
         SC, 
+        0, 
+        NULL, 
+        NULL);
+
+    return status;
+}
+
+cl_int createPheremoneProgram(cl_int status){
+    pherProgram = clCreateProgramWithSource(
+        context, 
+        1, 
+        (const char**)&pherProgramSource,                                 
+        NULL, 
+        &status);
+
+    status |= clBuildProgram(
+        pherProgram, 
+        numDevices, 
+        devices, 
+        NULL, 
+        NULL, 
+        NULL);
+
+    return status;
+}
+
+cl_int createPherBuffers(cl_int status){
+
+    // if doing CL_MEM_READ_WRITE
+
+    pbufferParam = clCreateBuffer(
+        context,
+        CL_MEM_READ_ONLY,
+        sizeof(Params),
+        NULL,
+        &status);
+
+    pbufferP = clCreateBuffer(
+        context, 
+        CL_MEM_READ_WRITE,                         
+        datasizeP, 
+        NULL, 
+        &status);
+
+    pbufferS = clCreateBuffer(
+        context, 
+        CL_MEM_READ_ONLY,                 
+        datasizeS, 
+        NULL, 
+        &status);
+
+    pbufferSC = clCreateBuffer(
+        context, 
+        CL_MEM_READ_ONLY,                 
+        datasizeSC, 
+        NULL, 
+        &status);
+
+    //-----------------------------------------------------
+    // STEP 6: Write host data to device buffers
+    //----------------------------------------------------- 
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferP, 
+        CL_FALSE, 
+        0, 
+        datasizeP,                         
+        P, 
+        0, 
+        NULL, 
+        NULL);
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferS, 
+        CL_FALSE, 
+        0, 
+        datasizeS,                         
+        S, 
+        0, 
+        NULL, 
+        NULL);
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferSC, 
+        CL_FALSE, 
+        0, 
+        datasizeSC,                         
+        SC, 
+        0, 
+        NULL, 
+        NULL);
+
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferParam, 
+        CL_TRUE, 
+        0, 
+        datasizeParams,                                  
+        &params, 
+        0, 
+        NULL, 
+        NULL);
+    return status;
+}
+
+cl_int queuePherUpdate(cl_int status, int nodes){
+
+    kernel = clCreateKernel(pherProgram, "update", &status);
+
+    status  |= clSetKernelArg(
+        kernel, 
+        0, 
+        sizeof(cl_mem), 
+        &pbufferParam);
+    status |= clSetKernelArg(
+        kernel, 
+        1, 
+        sizeof(cl_mem), 
+        &pbufferP);
+    status |= clSetKernelArg(
+        kernel, 
+        2, 
+        sizeof(cl_mem), 
+        &pbufferS);
+    status |= clSetKernelArg(
+        kernel, 
+        3, 
+        sizeof(cl_mem), 
+        &pbufferSC);
+
+    //-----------------------------------------------------
+    // STEP 10: Configure the work-item structure
+    //-----------------------------------------------------   
+    size_t globalWorkSize[1];    
+    globalWorkSize[0] = nodes;
+
+    //-----------------------------------------------------
+    // STEP 11: Enqueue the kernel for execution
+    //----------------------------------------------------- 
+    
+    // Execute the kernel by using 
+    // clEnqueueNDRangeKernel().
+    // 'globalWorkSize' is the 1D dimension of the 
+    // work-items
+    status |= clEnqueueNDRangeKernel(
+        cmdQueue, 
+        kernel, 
+        1, 
+        NULL, 
+        globalWorkSize, 
+        NULL, 
+        0, 
+        NULL, 
+        NULL);
+}
+
+cl_int readPherOutput(cl_int status){
+    status |= clEnqueueReadBuffer(
+        cmdQueue, 
+        bufferP, 
+        CL_TRUE, 
+        0, 
+        datasizeP, 
+        P, 
         0, 
         NULL, 
         NULL);

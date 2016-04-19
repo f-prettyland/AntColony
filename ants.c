@@ -153,8 +153,9 @@ void initialiseDatastructures(){
 
     getRandsDoub(R, nodes, randBound);
     createGraph();
-    size_t source_size =readInKernel(nodes);
-
+    size_t source_size =readInKernel(nodes, antProgramSource, antFileName, true);
+    puts(antProgramSource);
+    printf("heey\n");
     if(pherStart==-1){
         //perform random walk
         pherStart=(1.f/randomWalkLength());
@@ -281,6 +282,16 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    if(parallelP){
+        readInKernel(0, pherProgramSource, pherFileName, false);
+        
+        status |=  createPheremoneProgram(status);
+        if(status < 0){
+            fprintf(stderr, "%s %d\n", "Error in program compilation with error code: ", status);
+            exit(0);
+        }
+    }
+
 
     if(verbosity>=2){
         outputPheremoneArray();
@@ -295,7 +306,7 @@ int main(int argc, char *argv[]) {
 
         clFinish(cmdQueue);
         
-        status |= readOutput(status);
+        status |= readAntOutput(status);
 
         if(verbosity>=1){
             outputSolutionArray(i);
@@ -305,14 +316,31 @@ int main(int argc, char *argv[]) {
         if(SC[bs]<bestSolnThroughout){
             bestSolnThroughout = SC[bs];
         }
-        updatePheremonesSeq(S, P, SC, k, nodes);
+
+        if(!parallelP){
+            updatePheremonesSeq(S, P, SC, k, nodes);
+        }else{
+
+            status |=  createPherBuffers(status);
+            if(status < 0){
+                fprintf(stderr, "%s %d\n", "Error in buffer generation with error code: ", status);
+                exit(0);
+            }
+
+            status |= queuePherUpdate(status, nodes);
+
+            clFinish(cmdQueue);
+            
+            status |= readPherOutput(status);
+            
+        }
 
         if(verbosity>=2){
             outputPheremoneArray();
         }
     }
 
-    
+
     int bs = bestSoln();
     if(verbosity>=0){
         printf("\n");
