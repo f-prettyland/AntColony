@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <limits.h>
 #include "BorrowedFunc.h"
 #include "Structure.h"
@@ -300,6 +301,8 @@ int main(int argc, char *argv[]) {
     }
     double bestSolnThroughout = (INT_MAX-1);
 
+    clock_t start = clock(), diff;
+
     for (int i = 0; i < maxIter; ++i)
     {
 
@@ -337,15 +340,16 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "%s %d\n", "Error in pheremone buffer output with error code: ", status);
                 exit(0);
             }
-            
         }
 
         if(verbosity>=2){
             outputPheremoneArray();
         }
     }
+    diff = clock() - start;
 
-    
+    int msec = diff * 1000 / CLOCKS_PER_SEC;
+
     int bs = bestSoln();
     if(verbosity>=0){
         printf("\n");
@@ -357,8 +361,9 @@ int main(int argc, char *argv[]) {
             printf("%d ", S[(bs*(nodes+1))+p]);
         }
         printf("\nWith a total travel cost of %.2f though the lowest cost travel has been %.2f\n", SC[bs], bestSolnThroughout);
+        printf("It took %f millisecs\n", msec);
     }else{
-        printf("%d, %f, %f, %f, %d, %d, %d, %d, %f, %f", k, params.Evap, params.Alpha, params.Beta, maxIter, nodes, minCost, maxCost, SC[bs], bestSolnThroughout);
+        printf("%d, %f, %f, %f, %d, %d, %d, %d, %f, %f, %d\n", k, params.Evap, params.Alpha, params.Beta, maxIter, nodes, minCost, maxCost, SC[bs], bestSolnThroughout, msec);
     }
     freeMemory();
 }
