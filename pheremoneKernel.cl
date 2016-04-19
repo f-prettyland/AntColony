@@ -29,8 +29,8 @@ __kernel void update(
    {
        for (int j = 0; j < nodes; ++j)
        {
-            if(idx == S[(i*k)+j]){
-                int cityDst = S[(i*k)+j+1];
+            if(idx == S[(i*(nodes+1))+j]){
+                int cityDst = S[(i*(nodes+1))+j+1];
                 P[(idx*nodes)+cityDst] += (1.f/SC[i]);
             }
        }

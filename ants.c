@@ -15,7 +15,7 @@ int minCost;
 double pherStart;
 int randBound = 10;
 int verbosity = 1;
-bool parallelP = true;
+bool parallelP = false;
 
 void handleArguments(int argc, char *argv[]){
     if(argc<8){
@@ -34,7 +34,7 @@ void handleArguments(int argc, char *argv[]){
         puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
         printf("-rB random bound limit [if left blank will take harcoded limit: %d]\n", randBound);
         printf("-vB verbosity, 0 is only final output, 1 is intermediate solutions, 2 is intermediate all values, -1 is for csv output [if left blank will take harcoded limit: %d]\n", verbosity);
-        printf("-sPh sets to do serial pheremonal updates\n");
+        printf("-pPh sets to do parallel pheremonal updates\n");
         exit(0);
     }
 
@@ -77,8 +77,8 @@ void handleArguments(int argc, char *argv[]){
         //flags
         for (int i = 9; i < (argc); ++i)
         {
-            if((p = strstr(argv[i], "-sPh"))){
-                parallelP =false;
+            if((p = strstr(argv[i], "-pPh"))){
+                parallelP =true;
             }
         }
     }
@@ -214,8 +214,8 @@ void updatePheremonesSeq(int *S, double *P, double *SC, int k, int nodes) {
     {
         for (int j = 0; j < nodes; ++j)
         {
-            int citysrc = S[(i*k)+j];
-            int cityDst = S[(i*k)+j+1];
+            int citysrc = S[(i*(nodes+1))+j];
+            int cityDst = S[(i*(nodes+1))+j+1];
             P[(citysrc*nodes)+cityDst] += (1.f/SC[i]);
         }
     }
@@ -301,7 +301,7 @@ int main(int argc, char *argv[]) {
     }
     double bestSolnThroughout = (INT_MAX-1);
 
-    clock_t start = clock(), diff;
+    clock_t cl = clock(), diff;
 
     for (int i = 0; i < maxIter; ++i)
     {
@@ -346,7 +346,8 @@ int main(int argc, char *argv[]) {
             outputPheremoneArray();
         }
     }
-    diff = clock() - start;
+
+    diff = clock() - cl;
 
     int msec = diff * 1000 / CLOCKS_PER_SEC;
 
@@ -361,7 +362,7 @@ int main(int argc, char *argv[]) {
             printf("%d ", S[(bs*(nodes+1))+p]);
         }
         printf("\nWith a total travel cost of %.2f though the lowest cost travel has been %.2f\n", SC[bs], bestSolnThroughout);
-        printf("It took %f millisecs\n", msec);
+        printf("It took %d millisecs\n", msec);
     }else{
         printf("%d, %f, %f, %f, %d, %d, %d, %d, %f, %f, %d, %d\n", k, params.Evap, params.Alpha, params.Beta, maxIter, nodes, minCost, maxCost, SC[bs], bestSolnThroughout, parallelP, msec);
     }
