@@ -162,7 +162,7 @@ void initialiseDatastructures(){
 
     if(pherStart==-1){
         //perform random walk
-        pherStart=(1.f/randomWalkLength());
+        pherStart=(1.f/(nodes*randomWalkLength()));
     }
 
     // Initialize the input pheromones

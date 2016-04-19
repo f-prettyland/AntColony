@@ -116,8 +116,8 @@ cl_int platformsAndDevices(cl_int status){
     // STEP 2: Discover and initialize the devices
     //----------------------------------------------------- 
 
-    int platformToUse = 0;
-    // int platformToUse = 1;
+    // int platformToUse = 0;
+    int platformToUse = 1;
     cl_device_type dType = CL_DEVICE_TYPE_ALL;
     // cl_device_type dType = CL_DEVICE_TYPE_GPU;
 
