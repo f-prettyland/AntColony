@@ -72,6 +72,10 @@ void handleArguments(int argc, char *argv[]){
             if((p = strstr(argv[i], "-vB"))){
                 verbosity = atoi(argv[i+1]);
             }
+        }
+        //flags
+        for (int i = 9; i < (argc); ++i)
+        {
             if((p = strstr(argv[i], "-sPh"))){
                 parallelP =false;
             }
@@ -285,7 +289,15 @@ int main(int argc, char *argv[]) {
     if(verbosity>=2){
         outputPheremoneArray();
     }
+    if(parallelP){
+        readInPherKernel();
 
+        status |=  createPheremoneProgram(status);
+        if(status < 0){
+            fprintf(stderr, "%s %d\n", "Error in pheremone program compilation with error code: ", status);
+            exit(0);
+        }
+    }
     double bestSolnThroughout = (INT_MAX-1);
 
     for (int i = 0; i < maxIter; ++i)
@@ -305,7 +317,28 @@ int main(int argc, char *argv[]) {
         if(SC[bs]<bestSolnThroughout){
             bestSolnThroughout = SC[bs];
         }
-        updatePheremonesSeq(S, P, SC, k, nodes);
+        if(!parallelP){
+            updatePheremonesSeq(S, P, SC, k, nodes);
+        }else{
+            status |=  createPherBuffers(status);
+            if(status < 0){
+                fprintf(stderr, "%s %d\n", "Error in pheremone buffer generation with error code: ", status);
+                exit(0);
+            }
+            status |= queuePherUpdate(status, nodes);
+            if(status < 0){
+                fprintf(stderr, "%s %d\n", "Error in pheremone execution with error code: ", status);
+                exit(0);
+            }
+            clFinish(cmdQueue);
+            
+            status |= readPherOutput(status);
+            if(status < 0){
+                fprintf(stderr, "%s %d\n", "Error in pheremone buffer output with error code: ", status);
+                exit(0);
+            }
+            
+        }
 
         if(verbosity>=2){
             outputPheremoneArray();

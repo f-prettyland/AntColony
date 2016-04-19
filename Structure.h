@@ -8,6 +8,10 @@ const char nodePlusReplace[] = "NODESIZEPLUS1";
 
 char * programSource;
 
+
+const char pherFileName[] = "./pheremoneKernel.cl";
+char * pherProgramSource;
+
 typedef struct Params
 {
     int Nodes;
@@ -23,6 +27,9 @@ cl_context context = NULL;
 cl_uint numDevices = 0;
 cl_device_id *devices = NULL;
 cl_program program = NULL;
+
+cl_program pherProgram = NULL;
+
 cl_kernel kernel = NULL;
 
 cl_mem bufferParam;  // parameters on the device
@@ -31,6 +38,11 @@ cl_mem bufferP;  // Pheromone array on the device
 cl_mem bufferR;  // Input array on the device
 cl_mem bufferS;  // Output path from the device
 cl_mem bufferSC;  // Output cost from the device
+
+cl_mem pbufferParam;  // parameters on the device
+cl_mem pbufferP;  // Pheromone array on the device
+cl_mem pbufferS;  // Output path from the device
+cl_mem pbufferSC;  // Output cost from the device
 
 // Host data
 Params params;
@@ -361,4 +373,190 @@ cl_int readOutput(cl_int status){
         NULL);
 
     return status;
+}
+
+
+cl_int createPheremoneProgram(cl_int status){
+    pherProgram = clCreateProgramWithSource(
+        context, 
+        1, 
+        (const char**)&pherProgramSource,                                 
+        NULL, 
+        &status);
+
+    status |= clBuildProgram(
+        pherProgram, 
+        numDevices, 
+        devices, 
+        NULL, 
+        NULL, 
+        NULL);
+
+    return status;
+}
+
+cl_int createPherBuffers(cl_int status){
+
+    // if doing CL_MEM_READ_WRITE
+
+    pbufferParam = clCreateBuffer(
+        context,
+        CL_MEM_READ_ONLY,
+        sizeof(Params),
+        NULL,
+        &status);
+
+    pbufferP = clCreateBuffer(
+        context, 
+        CL_MEM_READ_WRITE,                         
+        datasizeP, 
+        NULL, 
+        &status);
+
+    pbufferS = clCreateBuffer(
+        context, 
+        CL_MEM_READ_ONLY,                 
+        datasizeS, 
+        NULL, 
+        &status);
+
+    pbufferSC = clCreateBuffer(
+        context, 
+        CL_MEM_READ_ONLY,                 
+        datasizeSC, 
+        NULL, 
+        &status);
+
+    //-----------------------------------------------------
+    // STEP 6: Write host data to device buffers
+    //----------------------------------------------------- 
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferP, 
+        CL_FALSE, 
+        0, 
+        datasizeP,                         
+        P, 
+        0, 
+        NULL, 
+        NULL);
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferS, 
+        CL_FALSE, 
+        0, 
+        datasizeS,                         
+        S, 
+        0, 
+        NULL, 
+        NULL);
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferSC, 
+        CL_FALSE, 
+        0, 
+        datasizeSC,                         
+        SC, 
+        0, 
+        NULL, 
+        NULL);
+
+
+    status |= clEnqueueWriteBuffer(
+        cmdQueue, 
+        pbufferParam, 
+        CL_TRUE, 
+        0, 
+        datasizeParams,                                  
+        &params, 
+        0, 
+        NULL, 
+        NULL);
+    return status;
+}
+
+cl_int queuePherUpdate(cl_int status, int nodes){
+
+    kernel = clCreateKernel(pherProgram, "update", &status);
+
+    status  |= clSetKernelArg(
+        kernel, 
+        0, 
+        sizeof(cl_mem), 
+        &pbufferParam);
+    status |= clSetKernelArg(
+        kernel, 
+        1, 
+        sizeof(cl_mem), 
+        &pbufferP);
+    status |= clSetKernelArg(
+        kernel, 
+        2, 
+        sizeof(cl_mem), 
+        &pbufferS);
+    status |= clSetKernelArg(
+        kernel, 
+        3, 
+        sizeof(cl_mem), 
+        &pbufferSC);
+
+    //-----------------------------------------------------
+    // STEP 10: Configure the work-item structure
+    //-----------------------------------------------------   
+    size_t globalWorkSize[1];    
+    globalWorkSize[0] = nodes;
+
+    //-----------------------------------------------------
+    // STEP 11: Enqueue the kernel for execution
+    //----------------------------------------------------- 
+    
+    // Execute the kernel by using 
+    // clEnqueueNDRangeKernel().
+    // 'globalWorkSize' is the 1D dimension of the 
+    // work-items
+    status |= clEnqueueNDRangeKernel(
+        cmdQueue, 
+        kernel, 
+        1, 
+        NULL, 
+        globalWorkSize, 
+        NULL, 
+        0, 
+        NULL, 
+        NULL);
+}
+
+cl_int readPherOutput(cl_int status){
+    status |= clEnqueueReadBuffer(
+        cmdQueue, 
+        pbufferP, 
+        CL_TRUE, 
+        0, 
+        datasizeP, 
+        P, 
+        0, 
+        NULL, 
+        NULL);
+
+    return status;
+}
+
+size_t readInPherKernel(){
+    FILE *fp;
+    size_t source_size;
+
+    /* Load kernel source file */
+    fp = fopen(pherFileName, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed to load kernel.\n");    
+        exit(1);
+    }   
+    pherProgramSource = (char *)malloc(MAX_SOURCE_SIZE);
+    source_size = fread(pherProgramSource, 1, MAX_SOURCE_SIZE, fp);
+
+    fclose(fp);
+    return source_size;
 }

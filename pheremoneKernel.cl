@@ -16,9 +16,13 @@ __kernel void update(
             )
 {
    int idx = get_global_id(0);
+   int nodes = param->Nodes;
+   int k = param->K;
+   int evap = param->Evap;
+   
    for (int j = 0; j < nodes; ++j)
    {
-        P[(idx*nodes)+j] = ((1-params.Evap)*P[(idx*nodes)+j]);
+        P[(idx*nodes)+j] = ((1-evap)*P[(idx*nodes)+j]);
    }
 
    for (int i = 0; i < k; ++i)
@@ -27,9 +31,8 @@ __kernel void update(
        {
             if(idx == S[(i*k)+j]){
                 int cityDst = S[(i*k)+j+1];
-                P[(citysrc*nodes)+cityDst] += (1.f/SC[i]);
+                P[(idx*nodes)+cityDst] += (1.f/SC[i]);
             }
        }
    }
 }
-

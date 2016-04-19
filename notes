@@ -65,6 +65,9 @@ Discuss Phere
 	Our AS uses
 		1/C as our g(ij)
 
+		needs to be Cmax/C
+			otherwise scaling doesn't work
+
 	Initial if unset is taken from random walk
 
 	http://research.ijcaonline.org/volume97/number10/pxc3897353.pdf
