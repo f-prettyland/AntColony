@@ -4,6 +4,8 @@ typedef struct Params
     int StartNode;
     double Alpha;
     double Beta;
+    double Evap;
+    int K;
 } Params;
 
 int getProbableEdgeRandomly(double probab, __private double * edgeAttraction, int edgeProbSize, double sumEdgeProbs){
@@ -15,7 +17,6 @@ int getProbableEdgeRandomly(double probab, __private double * edgeAttraction, in
 	    }
     }
     return (edgeProbSize-1);
-    // return 0;
 }
 
 double getRandom(double seedSeed, int idx){
@@ -65,7 +66,6 @@ __kernel void stroll(
     solution[solnLength] = startNode;
     visited[startNode] = true;
 
-    bool dan = false;
     do{
     	//if it has gone to all the nodes, but is not at the beginning
     	if(solnLength==(nodes-1)){
@@ -80,7 +80,6 @@ __kernel void stroll(
     		//can be -1 as path to self should be 0 (not allowed)
 
     		//as not all nodes are in edge attraction need to map from place to place
-            int possiblePaths =0;
     		double sumPossEdgeAttract = 0;
 
     		for (int i = 0; i < nodes; ++i)
@@ -92,7 +91,6 @@ __kernel void stroll(
                     edgeAttraction[i] = pow(attractFromCost(possibleEdgeCost),alpha)*pow((P[((solution[solnLength])*nodes)+i]),beta);
     				//add to sum for nomarlisation later
     				sumPossEdgeAttract += edgeAttraction[i];
-                    possiblePaths++;
     			}else{
     				// already seen or zero cost
     				edgeAttraction[i] = 0;

@@ -1,5 +1,3 @@
-init phere
-
 para calc pheremone array
 improve function
 ACS
@@ -38,6 +36,8 @@ Compare:
 -------------
 Discuss ants:
 -------------
+	- non-read&write soln array, instead keep one private
+
 	- not using the cost array effectively, recalcing all of this so many times (well depending on k)
 
 	- attract from cost so can vary what causes attraction
@@ -64,6 +64,8 @@ Discuss Phere
 -------------
 	Our AS uses
 		1/C as our g(ij)
+
+	Initial if unset is taken from random walk
 
 	http://research.ijcaonline.org/volume97/number10/pxc3897353.pdf
 		Defines difference between Ant System and Ant Colony System [ACS has global/local]

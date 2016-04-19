@@ -14,6 +14,8 @@ typedef struct Params
     int StartNode;
     double Alpha;
     double Beta;
+    double Evap;
+    int K;
 } Params;
 
 cl_command_queue cmdQueue;
@@ -245,7 +247,7 @@ cl_int createAntBuffers(cl_int status){
     return status;
 }
 
-cl_int createProgram(cl_int status){
+cl_int createAntProgram(cl_int status){
     //-----------------------------------------------------
     // STEP 7: Create and compile the program
     //----------------------------------------------------- 

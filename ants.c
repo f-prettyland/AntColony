@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <limits.h>
 #include "BorrowedFunc.h"
 #include "Structure.h"
 
 int k;
-double evap;
 int maxIter;
 int nodes;
 int maxCost;
@@ -14,28 +14,32 @@ int minCost;
 double pherStart;
 int randBound = 10;
 int verbosity = 1;
+bool parallelP = true;
 
 void handleArguments(int argc, char *argv[]){
     if(argc<8){
         puts("---This program takes 7 arguments and 2 optional arguments:");
-        puts("number of ants per iteration");
-        puts("evaporation constant");
-        puts("alpha");
-        puts("beta");
-        puts("max number of iterations");
-        puts("number of nodes");
-        puts("maximum cost of an edge");
-        puts("minimum cost of an edge");
-        puts("\n---Optional");
+        puts("1 number of ants per iteration");
+        puts("2 evaporation constant");
+        puts("3 alpha");
+        puts("4 beta");
+        puts("5 max number of iterations");
+        puts("6 number of nodes");
+        puts("7 maximum cost of an edge");
+        puts("8 minimum cost of an edge");
+        puts("\nEg: ./ants 5 0.1 1 2 200 20 10 100");
+        puts("\n\n---Optional");
         puts("-iP initial pheremone [if left blank will perform random walk to guess value]");
         puts("-sN start node [if left blank will assign an ant starting location of (id mod number of nodes)]");
         printf("-rB random bound limit [if left blank will take harcoded limit: %d]\n", randBound);
-        printf("-vB verbosity, 0 is only final output, 1 is intermediate solutions, 2 is intermediate all values [if left blank will take harcoded limit: %d]\n", verbosity);
+        printf("-vB verbosity, 0 is only final output, 1 is intermediate solutions, 2 is intermediate all values, -1 is for csv output [if left blank will take harcoded limit: %d]\n", verbosity);
+        printf("-sPh sets to do serial pheremonal updates\n");
         exit(0);
     }
 
     k = atoi(argv[1]);
-    evap = atof(argv[2]);
+    params.K = k;
+    params.Evap = atof(argv[2]);
     params.Alpha = atof(argv[3]);
     params.Beta = atof(argv[4]);
     maxIter = atoi(argv[5]);
@@ -65,32 +69,12 @@ void handleArguments(int argc, char *argv[]){
             if((p = strstr(argv[i], "-rB"))){
                 randBound = atoi(argv[i+1]);
             }
-
             if((p = strstr(argv[i], "-vB"))){
                 verbosity = atoi(argv[i+1]);
             }
-        }
-    }
-}
-
-void updatePheremones(int *S, double *P, double evap, double *SC, int k, int nodes) {
-    //evaporate
-    for (int i = 0; i < k; ++i)
-    {
-        for (int j = 0; j < nodes; ++j)
-        {
-            P[(i*nodes)+j] = ((1-evap)*P[(i*nodes)+j]);
-        }
-    }
-
-    // drop pheremones proportional to success of path
-    for (int i = 0; i < k; ++i)
-    {
-        for (int j = 0; j < nodes; ++j)
-        {
-            int citysrc = S[(i*k)+j];
-            int cityDst = S[(i*k)+j+1];
-            P[(citysrc*nodes)+cityDst] += (1.f/SC[i]);
+            if((p = strstr(argv[i], "-sPh"))){
+                parallelP =false;
+            }
         }
     }
 }
@@ -105,12 +89,51 @@ void createGraph(){
     }
 }
 
-void initialiseDatastructures(){
-    if(pherStart==-1){
-        //perform random walk
-        pherStart=0.5;
+int randomWalkLength(){
+    bool visited[nodes];
+    for (int i = 0; i < nodes; ++i)
+    {
+        visited[i]=false;
     }
+    int startNode = 0;
+    int solnLength = 0;
+    double solnCost = 0;
+    int currNode = startNode ;
+    visited[startNode] = true;
+    pcg32_random_t rng;
+    pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf,(intptr_t)&nodes);
+    do{
+        if(solnLength==(nodes-1)){
+            solnCost += C[((currNode)*nodes)+0];
+            solnLength++;
+            currNode = startNode;
+        }else{
+            int possiblePlaces[nodes-1];
+            int numberOfPlaces=0;
 
+            for (int i = 0; i < nodes; ++i)
+            {
+                double possibleEdgeCost = C[((currNode)*nodes)+i];
+                if(possibleEdgeCost != 0 && !visited[i]){
+                    possiblePlaces[numberOfPlaces] =i;
+                    numberOfPlaces++;
+                }
+            }
+            int randomEdge = ((pcg32_boundedrand_r(&rng,numberOfPlaces)));
+            int chosenPath = possiblePlaces[randomEdge];
+
+            solnCost +=  C[((currNode)*nodes)+chosenPath];
+            visited[chosenPath] = true;
+            solnLength++;
+            currNode = chosenPath;
+        }
+    //whilst not at the beginning
+    }while((currNode) != startNode);
+    return solnCost;
+}
+
+
+void initialiseDatastructures(){
     // Compute the size of the data 
     datasizeParams   = sizeof(Params);
     datasizeC    = sizeof(double)*nodes*nodes;
@@ -128,16 +151,21 @@ void initialiseDatastructures(){
     S   = (int*)calloc ((nodes+1)*k, sizeof(int));
     SC  = (double*)malloc(datasizeSC);
 
+    getRandsDoub(R, nodes, randBound);
+    createGraph();
+    size_t source_size =readInKernel(nodes);
+
+    if(pherStart==-1){
+        //perform random walk
+        pherStart=(1.f/randomWalkLength());
+    }
+
     // Initialize the input pheromones
     for(int j = 0; j < nodes; j++) {
         for(int i = 0; i < nodes; i++) {
             P[(j*nodes)+i] = pherStart;
         }
     }
-
-    getRandsDoub(R, nodes, randBound);
-    createGraph();
-    size_t source_size =readInKernel(nodes);
 }
 
 void freeMemory(){
@@ -166,6 +194,27 @@ void freeMemory(){
     free(devices);
 }
 
+void updatePheremonesSeq(int *S, double *P, double *SC, int k, int nodes) {
+    //evaporate
+    for (int i = 0; i < nodes; ++i)
+    {
+        for (int j = 0; j < nodes; ++j)
+        {
+            P[(i*nodes)+j] = ((1-params.Evap)*P[(i*nodes)+j]);
+        }
+    }
+
+    // drop pheremones proportional to success of path
+    for (int i = 0; i < k; ++i)
+    {
+        for (int j = 0; j < nodes; ++j)
+        {
+            int citysrc = S[(i*k)+j];
+            int cityDst = S[(i*k)+j+1];
+            P[(citysrc*nodes)+cityDst] += (1.f/SC[i]);
+        }
+    }
+}
 
 int bestSoln(){
     int best =0;
@@ -176,6 +225,38 @@ int bestSoln(){
         }
     }
     return best;
+}
+
+void outputSolutionArray(int i){
+    printf("\n");
+    printf("\n");
+    printf("------------------\n");
+    printf("Iteration %d\n", i);
+    printf("------------------\n");
+    for (int j = 0; j < k; ++j)
+    {
+        printf("Output %d is dun %d, score: %.2f\n",i, j, SC[j]);
+        for (int p = 0; p < nodes+1; ++p)
+        {
+            printf("%d ", S[(j*(nodes+1))+p]);
+        }
+        printf("\n");
+    }
+}
+
+void outputPheremoneArray(){
+    printf("%s\n", "PHEREMONE");
+    printf("%s\n", "---------");
+    for (int j = 0; j < nodes; ++j)
+    {
+        for (int p = 0; p < nodes; ++p)
+        {
+            printf("%f ", P[(j*(nodes))+p]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+    printf("\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -194,26 +275,18 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "%s %d\n", "Error in buffer generation with error code: ", status);
         exit(0);
     }
-    status |=  createProgram(status);
+    status |=  createAntProgram(status);
     if(status < 0){
         fprintf(stderr, "%s %d\n", "Error in compilation with error code: ", status);
         exit(0);
     }
-    
+
+
     if(verbosity>=2){
-        printf("%s\n", "INIT PHEREMONE");
-        printf("%s\n", "---------");
-        for (int j = 0; j < nodes; ++j)
-        {
-            for (int p = 0; p < nodes; ++p)
-            {
-                printf("%f ", P[(j*(nodes))+p]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-        printf("\n");
+        outputPheremoneArray();
     }
+
+    double bestSolnThroughout = (INT_MAX-1);
 
     for (int i = 0; i < maxIter; ++i)
     {
@@ -225,50 +298,34 @@ int main(int argc, char *argv[]) {
         status |= readOutput(status);
 
         if(verbosity>=1){
-            printf("\n");
-            printf("\n");
-            printf("------------------\n");
-            printf("Iteration %d\n", i);
-            printf("------------------\n");
-            for (int j = 0; j < k; ++j)
-            {
-                printf("Output %d is dun %d, score: %f\n",i, j, SC[j]);
-                for (int p = 0; p < nodes+1; ++p)
-                {
-                    printf("%d ", S[(j*(nodes+1))+p]);
-                }
-                printf("\n");
-            }
+            outputSolutionArray(i);
         }
 
-        updatePheremones(S, P, evap, SC, k, nodes);
+        int bs = bestSoln();
+        if(SC[bs]<bestSolnThroughout){
+            bestSolnThroughout = SC[bs];
+        }
+        updatePheremonesSeq(S, P, SC, k, nodes);
 
         if(verbosity>=2){
-            printf("%s\n", "PHEREMONE");
-            printf("%s\n", "---------");
-            for (int j = 0; j < nodes; ++j)
-            {
-                for (int p = 0; p < nodes; ++p)
-                {
-                    printf("%f ", P[(j*(nodes))+p]);
-                }
-                printf("\n");
-            }
-            printf("\n");
-            printf("\n");
+            outputPheremoneArray();
         }
     }
-    
-    printf("\n");
-    printf("\n");
-    printf("------------------------------------\n");
-    printf("After %d iterations best solution is: \n", maxIter);
-    int bs = bestSoln();
-    for (int p = 0; p < nodes+1; ++p)
-    {
-        printf("%d ", S[(bs*(nodes+1))+p]);
-    }
-    printf("\nWith a total travel cost of %f\n", SC[bs]);
 
+    
+    int bs = bestSoln();
+    if(verbosity>=0){
+        printf("\n");
+        printf("\n");
+        printf("------------------------------------\n");
+        printf("After %d iterations the lowest final value is: \n", maxIter);
+        for (int p = 0; p < nodes+1; ++p)
+        {
+            printf("%d ", S[(bs*(nodes+1))+p]);
+        }
+        printf("\nWith a total travel cost of %.2f though the lowest cost travel has been %.2f\n", SC[bs], bestSolnThroughout);
+    }else{
+        printf("%d, %f, %f, %f, %d, %d, %d, %d, %f, %f", k, params.Evap, params.Alpha, params.Beta, maxIter, nodes, minCost, maxCost, SC[bs], bestSolnThroughout);
+    }
     freeMemory();
 }
