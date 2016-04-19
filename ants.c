@@ -363,7 +363,7 @@ int main(int argc, char *argv[]) {
         printf("\nWith a total travel cost of %.2f though the lowest cost travel has been %.2f\n", SC[bs], bestSolnThroughout);
         printf("It took %f millisecs\n", msec);
     }else{
-        printf("%d, %f, %f, %f, %d, %d, %d, %d, %f, %f, %d\n", k, params.Evap, params.Alpha, params.Beta, maxIter, nodes, minCost, maxCost, SC[bs], bestSolnThroughout, msec);
+        printf("%d, %f, %f, %f, %d, %d, %d, %d, %f, %f, %d, %d\n", k, params.Evap, params.Alpha, params.Beta, maxIter, nodes, minCost, maxCost, SC[bs], bestSolnThroughout, parallelP, msec);
     }
     freeMemory();
 }

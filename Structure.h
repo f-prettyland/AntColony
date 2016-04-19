@@ -3,6 +3,7 @@
 #define MAX_NODES_DIGITS (15)
 
 const char fileName[] = "./antKernel.cl";
+// const char fileName[] = "./antKernel.cl";
 const char nodeReplace[] = "NODESIZE";
 const char nodePlusReplace[] = "NODESIZEPLUS1";
 
