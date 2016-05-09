@@ -2,6 +2,7 @@ para calc pheremone array
 improve function
 ACS
 para calc prob array
+ ^ Or just cache results with __local
 
 Not running right? Do you:
 	DO YOU CALL THE FUNCTION?
