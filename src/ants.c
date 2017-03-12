@@ -19,7 +19,7 @@ bool parallelP = false;
 
 void handleArguments(int argc, char *argv[]){
     if(argc<8){
-        puts("---This program takes 7 arguments and 2 optional arguments:");
+        puts("---This program takes 7 arguments and 5 optional arguments:");
         puts("1 number of ants per iteration");
         puts("2 evaporation constant");
         puts("3 alpha");

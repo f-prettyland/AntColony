@@ -1,6 +1,6 @@
 #!/bin/bash
 
-outputFile="results.csv"
+outputFile="../results/alpha-beta-results.csv"
 ants=10
 for alpha in `seq 1 1`;
 do

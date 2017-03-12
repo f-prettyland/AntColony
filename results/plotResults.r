@@ -1,11 +1,11 @@
-dat = read.csv("/cs/home/fp26/workspace_linux/AntColony/results/resultsNodes.csv")
+dat = read.csv("/path/to/resultsNodes.csv")
 plot(dat$nodes, dat$msec, xlab='Nodes', ylab='Time (ms)', col="red")
 title(main = "Nodes vs Time for 20 Ants and 200 Iterations")
 
 #finding how many find best
 a <- dat[dat$SC.bs.==dat$bestSolnThroughout,]
 
-dat = read.csv("/cs/home/fp26/workspace_linux/AntColony/results/compiledParaVNorm.csv")
+dat = read.csv("/path/to/compiledParaVNorm.csv")
 par <- dat[dat$parallelP==1&dat$nodes<40,]
 seq <- dat[dat$parallelP==0&dat$nodes<40,]
 

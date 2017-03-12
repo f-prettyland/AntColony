@@ -25,7 +25,7 @@ Different parallelisations:
 -------------
 Compare:
 -------------
-	- prove random araray is random (enough)
+	- [x] prove random araray is random (enough)
 	- diff attract-cost functions 
 	- probable edge check for zero case and does no maths, see if this speeds up
 	- compiling with constants
@@ -132,7 +132,7 @@ TODO
 APPEND
 -------------
 		
-//using shitty visitin list
+//bad visitin list
 bool hasSeen(int* visited, int possVisit){
 	for (int i = 0; i < numNodes; ++i)
 	{

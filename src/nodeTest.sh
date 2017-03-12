@@ -1,6 +1,6 @@
 #!/bin/bash
 
-outputFile="./results/resultsNodes30Ants-pPh.csv"
+outputFile="../results/resultsNodes30Ants-pPh.csv"
 ants=30
 alpha=1
 beta=3
