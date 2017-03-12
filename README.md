@@ -13,8 +13,8 @@ The host code is separated into three files `ants.c`, `BorrowedFunc.h` and `Stru
 
 ### Pheromones  
 The default initial value for all pheromones is calculated as the inverse of the length random walk multiplied by the number of nodes present, influenced by the research performed by Sonigoswami et al, 2014 (ISSN : 2248 - 9622). 
-The update value applied to pheromones can be performed in one sequential or parallel update (see flags), with the phermonal update function, g (the amount added to each edge), set as:
-![](/graphics-graphs/pher-update.png)
+The update value applied to pheromones can be performed in one sequential or parallel update (see flags), with the phermonal update function, g (the amount added to each edge), set as:  
+<img src="./graphics-graphs/pher-update.PNG" height="50em" align="center">  
 Where S<sub>k</sub> is the solution from the k<sup>th</sup> ant. Note the parallel update is a more inefficient calculation, as since OpenCL does not allow for lock free editing of data values, instead each work item must have to work on a separate section of the pheromone array. Okay for evaporation, not for iterating over solutions.  
 
 ### Randomness  
